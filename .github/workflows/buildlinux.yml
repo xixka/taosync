@@ -64,7 +64,8 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        platform: [ "amd64", "arm64" ]  # 只编译 amd64 和 arm64
+        # 添加386和arm/v7支持
+        platform: [ "amd64", "386", "arm64", "arm/v7" ]
           
     steps:
       - name: 检出仓库代码
@@ -86,7 +87,9 @@ jobs:
         run: |
           case "${{ matrix.platform }}" in
             amd64)   TARGET_ARCH="amd64" ;;
+            386)     TARGET_ARCH="386" ;;
             arm64)   TARGET_ARCH="arm64" ;;
+            arm/v7)  TARGET_ARCH="arm" ;;
           esac
           echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
           echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
@@ -97,16 +100,18 @@ jobs:
           
       - name: 在Docker容器中构建
         run: |
-          # 使用兼容旧系统的镜像
+          # 为不同架构选择合适的基础镜像
           case "${{ matrix.platform }}" in
-            amd64)   BASE_IMAGE="python:3.11-slim-bullseye" ;;  # Debian 11 (glibc 2.31)
+            amd64)   BASE_IMAGE="python:3.11-slim-bullseye" ;;
+            386)     BASE_IMAGE="i386/python:3.11-slim-bullseye" ;;
             arm64)   BASE_IMAGE="arm64v8/python:3.11-slim-bullseye" ;;
+            arm/v7)  BASE_IMAGE="arm32v7/python:3.11-slim-bullseye" ;;
           esac
 
           echo "使用兼容镜像: $BASE_IMAGE"
           
           docker run --rm \
-            --platform linux/${{ env.TARGET_ARCH }} \
+            --platform linux/${{ env.TARGET_PLATFORM }} \
             -v "$(pwd):/app" \
             -w /app \
             $BASE_IMAGE \
