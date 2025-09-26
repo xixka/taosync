@@ -94,36 +94,32 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y qemu-user-static binfmt-support
+          # 注册所有支持的架构格式
+          sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
       - name: 安装依赖并构建打包
         run: |
-          # 设置平台参数
+          # 修正架构映射关系
           case "${{ matrix.platform }}" in
-            amd64)   ARCH="x86_64" ;;
-            arm64)   ARCH="aarch64" ;;
-            armv7)   ARCH="armv7l" ;;
-            386)     ARCH="i686" ;;
-            armv6)   ARCH="armv6l" ;;
-            s390x)   ARCH="s390x" ;;
-            ppc64le) ARCH="ppc64le" ;;
+            amd64)   ARCH="x86_64"; QEMU_ARCH="" ;;
+            arm64)   ARCH="aarch64"; QEMU_ARCH="aarch64" ;;
+            armv7)   ARCH="armv7l"; QEMU_ARCH="arm" ;;
+            386)     ARCH="i686"; QEMU_ARCH="i386" ;;
+            armv6)   ARCH="armv6l"; QEMU_ARCH="arm" ;;
+            s390x)   ARCH="s390x"; QEMU_ARCH="s390x" ;;
+            ppc64le) ARCH="ppc64le"; QEMU_ARCH="ppc64le" ;;
           esac
           
-          # 使用QEMU设置平台
+          # 仅非amd64平台需要设置QEMU
           if [ "${{ matrix.platform }}" != "amd64" ]; then
-            # 修复：使用引号包裹变量，确保参数正确传递
-            sudo update-binfmts --enable "qemu-$ARCH"
-            sudo cp "/usr/bin/qemu-$ARCH-static" .
+            # 使用标准QEMU架构名称
+            sudo cp "/usr/bin/qemu-${QEMU_ARCH}-static" .
           fi
           
           # 安装依赖并构建
           python -m pip install 'pyinstaller>=6,<7'
           python -m pip install -r requirements.txt
           python -m PyInstaller "$APP_NAME.spec"
-          
-          # 清理QEMU设置
-          if [ "${{ matrix.platform }}" != "amd64" ]; then
-            sudo update-binfmts --disable "qemu-$ARCH"
-          fi
           
           # 修复：复制文件到临时目录再打包
           mkdir -p temp_dist
