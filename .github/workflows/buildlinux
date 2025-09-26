@@ -1,0 +1,138 @@
+name: 构建
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  APP_NAME: taoSync
+
+jobs:
+  get-version:
+    name: 获取版本号
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.getVersion.outputs.VERSION }}
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - id: getVersion
+        name: 获取版本号
+        run: |
+          versions=$(head -n 1 version.txt)
+          IFS=',' read -ra versionList <<< "$versions"
+          cuVersion="${versionList[0]}"
+          echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
+
+  build-frontend:
+    name: 构建前端
+    runs-on: ubuntu-latest
+    needs: [ get-version ]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 安装Node.js 14.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: "14.x"
+
+      - name: 安装依赖并构建前端
+        run: |
+          sed -i "s/__version_placeholder__/$VERSION/g" frontend/src/views/page/setting/index.vue
+          cd frontend
+          npm install
+          npm run build
+
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
+
+  build-linux:
+    name: 构建Linux
+    runs-on: ubuntu-latest
+    needs: [ get-version, build-frontend ]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+    strategy:
+      matrix:
+        platform:
+          - amd64
+          - arm64
+          - armv7
+          - 386
+          - armv6
+          - s390x
+          - ppc64le
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载前端
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: 设置python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装QEMU（多平台支持）
+        if: ${{ matrix.platform != 'amd64' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+
+      - name: 安装依赖并构建打包
+        run: |
+          # 设置平台参数
+          case "${{ matrix.platform }}" in
+            amd64)   ARCH="x86_64" ;;
+            arm64)   ARCH="aarch64" ;;
+            armv7)   ARCH="armv7l" ;;
+            386)     ARCH="i686" ;;
+            armv6)   ARCH="armv6l" ;;
+            s390x)   ARCH="s390x" ;;
+            ppc64le) ARCH="ppc64le" ;;
+          esac
+          
+          # 使用QEMU设置平台
+          if [ "${{ matrix.platform }}" != "amd64" ]; then
+            export SETARCH="linux32"
+            export QEMU_SET="sudo update-binfmts --enable qemu-$ARCH && sudo cp /usr/bin/qemu-$ARCH-static ."
+            export QEMU_UNSET="sudo update-binfmts --disable qemu-$ARCH"
+          else
+            export SETARCH=""
+            export QEMU_SET=""
+            export QEMU_UNSET=""
+          fi
+          
+          # 安装依赖并构建
+          $SETARCH $QEMU_SET
+          python -m pip install 'pyinstaller>=6,<7'
+          python -m pip install -r requirements.txt
+          python -m PyInstaller "$APP_NAME.spec"
+          $SETARCH $QEMU_UNSET
+          
+          # 打包构建结果
+          cd dist
+          tar czf "$APP_NAME-$VERSION-linux-${{ matrix.platform }}.tar.gz" .
+
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux-${{ matrix.platform }}
+          path: dist/*.tar.gz
+          retention-days: 1
