@@ -70,7 +70,7 @@ jobs:
           - arm64
           - armv7
           - 386
-          - armv6
+          # 移除 armv6，因为官方镜像不支持
           - s390x
           - ppc64le
           
@@ -95,9 +95,8 @@ jobs:
           case "${{ matrix.platform }}" in
             amd64)   TARGET_ARCH="amd64" ;;
             arm64)   TARGET_ARCH="arm64" ;;
-            armv7)   TARGET_ARCH="armv7" ;;
+            armv7)   TARGET_ARCH="arm" ;;
             386)     TARGET_ARCH="386" ;;
-            armv6)   TARGET_ARCH="armv6" ;;
             s390x)   TARGET_ARCH="s390x" ;;
             ppc64le) TARGET_ARCH="ppc64le" ;;
           esac
@@ -110,12 +109,23 @@ jobs:
 
       - name: 在Docker容器中构建
         run: |
+          # 为不同平台选择合适的基础镜像
+          if [ "${{ env.TARGET_PLATFORM }}" = "armv7" ]; then
+            IMAGE="arm32v7/python:3.11-slim"
+          elif [ "${{ env.TARGET_PLATFORM }}" = "386" ]; then
+            IMAGE="i386/python:3.11-slim"
+          else
+            IMAGE="python:3.11-slim"
+          fi
+          
+          echo "使用镜像: $IMAGE"
+          
           # 运行容器并挂载当前目录
           docker run --rm \
             --platform linux/${{ env.TARGET_ARCH }} \
             -v "$(pwd):/app" \
             -w /app \
-            python:3.11-slim \
+            $IMAGE \
             sh -c "
               # 安装构建依赖
               apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
