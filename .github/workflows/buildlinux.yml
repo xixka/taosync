@@ -65,13 +65,7 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        platform:
-          - amd64
-          - arm64
-          - armv7
-          - 386
-          - s390x
-          - ppc64le
+        platform: [ "amd64", "arm64" ]  # 只编译 amd64 和 arm64
           
     steps:
       - name: 检出仓库代码
@@ -94,10 +88,6 @@ jobs:
           case "${{ matrix.platform }}" in
             amd64)   TARGET_ARCH="amd64" ;;
             arm64)   TARGET_ARCH="arm64" ;;
-            armv7)   TARGET_ARCH="arm" ;;
-            386)     TARGET_ARCH="386" ;;
-            s390x)   TARGET_ARCH="s390x" ;;
-            ppc64le) TARGET_ARCH="ppc64le" ;;
           esac
           echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
           echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
@@ -108,14 +98,8 @@ jobs:
 
       - name: 在Docker容器中构建
         run: |
-          # 为不同平台选择合适的基础镜像
-          if [ "${{ env.TARGET_PLATFORM }}" = "armv7" ]; then
-            IMAGE="arm32v7/python:3.11-slim"
-          elif [ "${{ env.TARGET_PLATFORM }}" = "386" ]; then
-            IMAGE="i386/python:3.11-slim"
-          else
-            IMAGE="python:3.11-slim"
-          fi
+          # 使用标准Python镜像，因为amd64和arm64都支持
+          IMAGE="python:3.11-slim"
           
           echo "使用镜像: $IMAGE"
           
