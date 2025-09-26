@@ -70,7 +70,6 @@ jobs:
           - arm64
           - armv7
           - 386
-          # 移除 armv6，因为官方镜像不支持
           - s390x
           - ppc64le
           
@@ -131,11 +130,12 @@ jobs:
               apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
               
               # 安装Python依赖
+              pip install --upgrade pip
               pip install 'pyinstaller>=6,<7'
               pip install -r requirements.txt
               
-              # 执行构建
-              pyinstaller $APP_NAME.spec \
+              # 执行构建 - 使用完整路径确保找到PyInstaller
+              python -m PyInstaller $APP_NAME.spec \
                 --distpath /app/dist/${{ env.TARGET_PLATFORM }} \
                 --workpath /app/build/${{ env.TARGET_PLATFORM }}
             "
