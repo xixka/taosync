@@ -126,13 +126,15 @@ jobs:
           python -m PyInstaller "$APP_NAME.spec"
           $SETARCH $QEMU_UNSET
           
-          # 打包构建结果
-          cd dist
-          tar czf "$APP_NAME-$VERSION-linux-${{ matrix.platform }}.tar.gz" .
+          # 修复：复制文件到临时目录再打包
+          mkdir -p temp_dist
+          cp -r dist/* temp_dist/
+          tar czf "$APP_NAME-$VERSION-linux-${{ matrix.platform }}.tar.gz" -C temp_dist .
+          rm -rf temp_dist
 
       - name: 上传artifact
         uses: actions/upload-artifact@v4
         with:
           name: dist-linux-${{ matrix.platform }}
-          path: dist/*.tar.gz
+          path: ${{ env.APP_NAME }}-${{ env.VERSION }}-linux-${{ matrix.platform }}.tar.gz
           retention-days: 1
