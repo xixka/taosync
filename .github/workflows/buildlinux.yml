@@ -68,12 +68,7 @@ jobs:
         platform:
           - amd64
           - arm64
-          - armv7
-          - 386
-          - armv6
-          - s390x
-          - ppc64le
-
+          
     steps:
       - name: 检出仓库代码
         uses: actions/checkout@v4
@@ -101,11 +96,6 @@ jobs:
           case "${{ matrix.platform }}" in
             amd64)   ARCH="x86_64" ;;
             arm64)   ARCH="aarch64" ;;
-            armv7)   ARCH="armv7l" ;;
-            386)     ARCH="i686" ;;
-            armv6)   ARCH="armv6l" ;;
-            s390x)   ARCH="s390x" ;;
-            ppc64le) ARCH="ppc64le" ;;
           esac
           
           # 使用QEMU设置平台
