@@ -26,6 +26,7 @@ jobs:
           IFS=',' read -ra versionList <<< "$versions"
           cuVersion="${versionList[0]}"
           echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
+
   build-frontend:
     name: 构建前端
     runs-on: ubuntu-latest
@@ -55,44 +56,81 @@ jobs:
           path: frontend/dist
           retention-days: 1
 
- build-linux:
-  name: 构建Linux多平台
-  runs-on: ubuntu-latest
-  needs: [ get-version, build-frontend ]
-  env:
-    VERSION: ${{ needs.get-version.outputs.VERSION }}
-  strategy:
-    matrix:
-      platform: [ "amd64", "arm64" ]
-  
-  steps:
-    # ...其他步骤保持不变...
-    
-    - name: 在Docker容器中构建
-      run: |
-        # 使用兼容旧系统的镜像
-        case "${{ matrix.platform }}" in
-          amd64)   BASE_IMAGE="python:3.11-slim-bullseye" ;;  # Debian 11 (glibc 2.31)
-          arm64)   BASE_IMAGE="arm64v8/python:3.11-slim-bullseye" ;;
-        esac
+  build-linux:
+    name: 构建Linux多平台
+    runs-on: ubuntu-latest
+    needs: [ get-version, build-frontend ]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+    strategy:
+      matrix:
+        platform: [ "amd64", "arm64" ]  # 只编译 amd64 和 arm64
+          
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
 
-        echo "使用兼容镜像: $BASE_IMAGE"
-        
-        docker run --rm \
-          --platform linux/${{ env.TARGET_ARCH }} \
-          -v "$(pwd):/app" \
-          -w /app \
-          $BASE_IMAGE \
-          sh -c "
-            apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
-            pip install --upgrade pip
-            pip install 'pyinstaller>=6,<7'
-            pip install -r requirements.txt
-            
-            # 添加修复：设置LD_LIBRARY_PATH
-            export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu
-            
-            pyinstaller taoSync.spec \
-              --distpath /app/dist/${{ env.TARGET_PLATFORM }} \
-              --workpath /app/build/${{ env.TARGET_PLATFORM }}
-          "
+      - name: 下载前端
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: 设置QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: 设置目标平台变量
+        id: set-platform
+        run: |
+          case "${{ matrix.platform }}" in
+            amd64)   TARGET_ARCH="amd64" ;;
+            arm64)   TARGET_ARCH="arm64" ;;
+          esac
+          echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
+          echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
+          
+      - name: 创建构建目录
+        run: |
+          mkdir -p dist/${{ env.TARGET_PLATFORM }}
+          
+      - name: 在Docker容器中构建
+        run: |
+          # 使用兼容旧系统的镜像
+          case "${{ matrix.platform }}" in
+            amd64)   BASE_IMAGE="python:3.11-slim-bullseye" ;;  # Debian 11 (glibc 2.31)
+            arm64)   BASE_IMAGE="arm64v8/python:3.11-slim-bullseye" ;;
+          esac
+
+          echo "使用兼容镜像: $BASE_IMAGE"
+          
+          docker run --rm \
+            --platform linux/${{ env.TARGET_ARCH }} \
+            -v "$(pwd):/app" \
+            -w /app \
+            $BASE_IMAGE \
+            sh -c "
+              # 安装构建依赖
+              apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
+              
+              # 安装Python依赖
+              pip install --upgrade pip
+              pip install 'pyinstaller>=6,<7'
+              pip install -r requirements.txt
+              
+              # 添加库路径修复
+              export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib/x86_64-linux-gnu
+              
+              # 执行构建
+              pyinstaller $APP_NAME.spec \
+                --distpath /app/dist/${{ env.TARGET_PLATFORM }} \
+                --workpath /app/build/${{ env.TARGET_PLATFORM }}
+            "
+                
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-linux-${{ env.TARGET_PLATFORM }}
+          path: dist/${{ env.TARGET_PLATFORM }}
+          retention-days: 1
