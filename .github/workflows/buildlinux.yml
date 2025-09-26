@@ -94,42 +94,67 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y qemu-user-static binfmt-support
-          # 注册所有支持的架构格式
           sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+      - name: 安装目标平台依赖
+        run: |
+          sudo apt-get update
+          # 安装目标平台的基础库
+          case "${{ matrix.platform }}" in
+            arm64)   sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu ;;
+            armv7)   sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf ;;
+            armv6)   sudo apt-get install -y gcc-arm-linux-gnueabi g++-arm-linux-gnueabi ;;
+            386)     sudo apt-get install -y gcc-i686-linux-gnu g++-i686-linux-gnu ;;
+          esac
+
+      - name: 设置目标平台变量
+        id: set-platform
+        run: |
+          case "${{ matrix.platform }}" in
+            amd64)   TARGET_ARCH="x86_64" ;;
+            arm64)   TARGET_ARCH="aarch64" ;;
+            armv7)   TARGET_ARCH="armv7l" ;;
+            386)     TARGET_ARCH="i686" ;;
+            armv6)   TARGET_ARCH="armv6l" ;;
+            s390x)   TARGET_ARCH="s390x" ;;
+            ppc64le) TARGET_ARCH="ppc64le" ;;
+          esac
+          echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
+          echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
+
+      - name: 配置交叉编译环境
+        if: ${{ matrix.platform != 'amd64' }}
+        run: |
+          # 设置交叉编译环境变量
+          case "${{ matrix.platform }}" in
+            arm64)   export CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ ;;
+            armv7)   export CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++ ;;
+            armv6)   export CC=arm-linux-gnueabi-gcc CXX=arm-linux-gnueabi-g++ ;;
+            386)     export CC=i686-linux-gnu-gcc CXX=i686-linux-gnu-g++ ;;
+          esac
+          echo "CC=$CC" >> $GITHUB_ENV
+          echo "CXX=$CXX" >> $GITHUB_ENV
 
       - name: 安装依赖并构建打包
         run: |
-          # 修正架构映射关系
-          case "${{ matrix.platform }}" in
-            amd64)   ARCH="x86_64"; QEMU_ARCH="" ;;
-            arm64)   ARCH="aarch64"; QEMU_ARCH="aarch64" ;;
-            armv7)   ARCH="armv7l"; QEMU_ARCH="arm" ;;
-            386)     ARCH="i686"; QEMU_ARCH="i386" ;;
-            armv6)   ARCH="armv6l"; QEMU_ARCH="arm" ;;
-            s390x)   ARCH="s390x"; QEMU_ARCH="s390x" ;;
-            ppc64le) ARCH="ppc64le"; QEMU_ARCH="ppc64le" ;;
-          esac
-          
-          # 仅非amd64平台需要设置QEMU
-          if [ "${{ matrix.platform }}" != "amd64" ]; then
-            # 使用标准QEMU架构名称
-            sudo cp "/usr/bin/qemu-${QEMU_ARCH}-static" .
-          fi
-          
-          # 安装依赖并构建
+          # 安装PyInstaller
           python -m pip install 'pyinstaller>=6,<7'
           python -m pip install -r requirements.txt
-          python -m PyInstaller "$APP_NAME.spec"
           
-          # 修复：复制文件到临时目录再打包
+          # 使用PyInstaller构建指定平台
+          pyinstaller $APP_NAME.spec \
+            --distpath "dist/${{ env.TARGET_PLATFORM }}" \
+            --workpath "build/${{ env.TARGET_PLATFORM }}"
+          
+          # 打包构建产物
           mkdir -p temp_dist
-          cp -r dist/* temp_dist/
-          tar czf "$APP_NAME-$VERSION-linux-${{ matrix.platform }}.tar.gz" -C temp_dist .
+          cp -r "dist/${{ env.TARGET_PLATFORM }}"/* temp_dist/
+          tar czf "$APP_NAME-$VERSION-linux-${{ env.TARGET_PLATFORM }}.tar.gz" -C temp_dist .
           rm -rf temp_dist
 
       - name: 上传artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dist-linux-${{ matrix.platform }}
-          path: ${{ env.APP_NAME }}-${{ env.VERSION }}-linux-${{ matrix.platform }}.tar.gz
+          name: dist-linux-${{ env.TARGET_PLATFORM }}
+          path: ${{ env.APP_NAME }}-${{ env.VERSION }}-linux-${{ env.TARGET_PLATFORM }}.tar.gz
           retention-days: 1
