@@ -100,21 +100,20 @@ jobs:
           
           # 使用QEMU设置平台
           if [ "${{ matrix.platform }}" != "amd64" ]; then
-            export SETARCH="linux32"
-            export QEMU_SET="sudo update-binfmts --enable qemu-$ARCH && sudo cp /usr/bin/qemu-$ARCH-static ."
-            export QEMU_UNSET="sudo update-binfmts --disable qemu-$ARCH"
-          else
-            export SETARCH=""
-            export QEMU_SET=""
-            export QEMU_UNSET=""
+            # 修复：使用引号包裹变量，确保参数正确传递
+            sudo update-binfmts --enable "qemu-$ARCH"
+            sudo cp "/usr/bin/qemu-$ARCH-static" .
           fi
           
           # 安装依赖并构建
-          $SETARCH $QEMU_SET
           python -m pip install 'pyinstaller>=6,<7'
           python -m pip install -r requirements.txt
           python -m PyInstaller "$APP_NAME.spec"
-          $SETARCH $QEMU_UNSET
+          
+          # 清理QEMU设置
+          if [ "${{ matrix.platform }}" != "amd64" ]; then
+            sudo update-binfmts --disable "qemu-$ARCH"
+          fi
           
           # 修复：复制文件到临时目录再打包
           mkdir -p temp_dist
