@@ -26,7 +26,7 @@ jobs:
           IFS=',' read -ra versionList <<< "$versions"
           cuVersion="${versionList[0]}"
           echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
-
+          
   build-frontend:
     name: 构建前端
     runs-on: ubuntu-latest
@@ -64,8 +64,7 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        # 添加386和arm/v7支持
-        platform: [ "amd64", "386", "arm64", "arm/v7" ]
+        platform: [ "amd64", "arm64", "armv7", "386" ]  # 新增armv7和386平台
           
     steps:
       - name: 检出仓库代码
@@ -87,9 +86,9 @@ jobs:
         run: |
           case "${{ matrix.platform }}" in
             amd64)   TARGET_ARCH="amd64" ;;
-            386)     TARGET_ARCH="386" ;;
             arm64)   TARGET_ARCH="arm64" ;;
-            arm/v7)  TARGET_ARCH="arm" ;;
+            armv7)   TARGET_ARCH="armv7" ;;  # 新增armv7
+            386)     TARGET_ARCH="386" ;;    # 新增386
           esac
           echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
           echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
@@ -100,18 +99,17 @@ jobs:
           
       - name: 在Docker容器中构建
         run: |
-          # 为不同架构选择合适的基础镜像
+          # 使用兼容旧系统的镜像
           case "${{ matrix.platform }}" in
-            amd64)   BASE_IMAGE="python:3.11-slim-bullseye" ;;
-            386)     BASE_IMAGE="i386/python:3.11-slim-bullseye" ;;
+            amd64)   BASE_IMAGE="python:3.11-slim-bullseye" ;;  # Debian 11 (glibc 2.31)
             arm64)   BASE_IMAGE="arm64v8/python:3.11-slim-bullseye" ;;
-            arm/v7)  BASE_IMAGE="arm32v7/python:3.11-slim-bullseye" ;;
+            armv7)   BASE_IMAGE="arm32v7/python:3.11-slim-bullseye" ;;  # armv7镜像
+            386)     BASE_IMAGE="i386/python:3.11-slim-bullseye" ;;    # 386镜像
           esac
-
           echo "使用兼容镜像: $BASE_IMAGE"
           
           docker run --rm \
-            --platform linux/${{ env.TARGET_PLATFORM }} \
+            --platform linux/${{ env.TARGET_ARCH }} \
             -v "$(pwd):/app" \
             -w /app \
             $BASE_IMAGE \
