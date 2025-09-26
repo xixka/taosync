@@ -111,31 +111,18 @@ jobs:
             sh -c "
               # 安装构建依赖
               apt-get update
-              apt-get install -y build-essential patchelf
-              pip install --upgrade pip
-              pip install 'pyinstaller>=6,<7' -r requirements.txt
+              apt-get install -y build-essential patchelf binutils
               
-              # 执行构建
-              pyinstaller $APP_NAME.spec \
-                --distpath /app/dist/${{ env.TARGET_PLATFORM }} \
-                --workpath /app/build/${{ env.TARGET_PLATFORM }} \
-                --add-binary '/usr/local/lib/lib*.so:.' \
-                --add-binary '/usr/lib/${{ env.TARGET_ARCH }}-linux-gnu/lib*.so:.'
+              # 创建非root用户
+              useradd -m builder
+              chown -R builder:builder /app
               
-              # 修复二进制依赖
-              if [ '${{ env.TARGET_ARCH }}' = 'arm64' ]; then
-                INTERPRETER='/lib/ld-linux-aarch64.so.1'
-              else
-                INTERPRETER='/lib64/ld-linux-x86-64.so.2'
-              fi
-              
-              find /app/dist/${{ env.TARGET_PLATFORM }} -type f -executable \
-                -exec patchelf --set-interpreter \"$INTERPRETER\" {} \; 2>/dev/null || true
-            "
-
-      - name: 上传artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist-linux-${{ env.TARGET_PLATFORM }}
-          path: dist/${{ env.TARGET_PLATFORM }}
-          retention-days: 1
+              # 切换到非root用户
+              su builder -c '
+                # 设置Python虚拟环境
+                python -m venv /home/builder/venv
+                source /home/builder/venv/bin/activate
+                
+                # 安装Python依赖
+                pip install --upgrade pip
+                pip install \"pyinstaller>=6,<7\" -
