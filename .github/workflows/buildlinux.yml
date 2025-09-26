@@ -26,7 +26,6 @@ jobs:
           IFS=',' read -ra versionList <<< "$versions"
           cuVersion="${versionList[0]}"
           echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
-          
   build-frontend:
     name: 构建前端
     runs-on: ubuntu-latest
@@ -64,7 +63,7 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        platform: [ "amd64", "arm64", "armv7", "386" ]  # 新增armv7和386平台
+        platform: [ "amd64", "arm64" ]  # 只编译 amd64 和 arm64
           
     steps:
       - name: 检出仓库代码
@@ -87,8 +86,6 @@ jobs:
           case "${{ matrix.platform }}" in
             amd64)   TARGET_ARCH="amd64" ;;
             arm64)   TARGET_ARCH="arm64" ;;
-            armv7)   TARGET_ARCH="armv7" ;;  # 新增armv7
-            386)     TARGET_ARCH="386" ;;    # 新增386
           esac
           echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
           echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
@@ -103,8 +100,6 @@ jobs:
           case "${{ matrix.platform }}" in
             amd64)   BASE_IMAGE="python:3.11-slim-bullseye" ;;  # Debian 11 (glibc 2.31)
             arm64)   BASE_IMAGE="arm64v8/python:3.11-slim-bullseye" ;;
-            armv7)   BASE_IMAGE="arm32v7/python:3.11-slim-bullseye" ;;  # armv7镜像
-            386)     BASE_IMAGE="i386/python:3.11-slim-bullseye" ;;    # 386镜像
           esac
           echo "使用兼容镜像: $BASE_IMAGE"
           
