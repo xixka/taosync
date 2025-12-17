@@ -95,7 +95,6 @@ jobs:
           
       - name: 在Docker容器中构建
         run: |
-          # 使用兼容旧系统的镜像
           case "${{ matrix.platform }}" in
             amd64)   BASE_IMAGE="python:3.11-slim-bullseye" ;;
             arm64)   BASE_IMAGE="arm64v8/python:3.11-slim-bullseye" ;;
@@ -103,7 +102,6 @@ jobs:
           esac
           echo "使用兼容镜像: $BASE_IMAGE"
           
-          # 设置库路径
           case "${{ matrix.platform }}" in
             amd64)   LIB_PATH="/usr/lib/x86_64-linux-gnu" ;;
             arm64)   LIB_PATH="/usr/lib/aarch64-linux-gnu" ;;
@@ -120,19 +118,14 @@ jobs:
             $BASE_IMAGE \
             sh -c '
               set -e
-              
-              # 安装构建依赖 - 关键修改：添加 zlib1g-dev
               apt-get update && apt-get install -y build-essential zlib1g-dev && rm -rf /var/lib/apt/lists/*
               
-              # 使用 python -m pip 确保安装到正确的Python环境
               python -m pip install --upgrade pip
               python -m pip install "pyinstaller>=6,<7"
               python -m pip install -r requirements.txt
               
-              # 添加库路径修复
               export LD_LIBRARY_PATH=/usr/local/lib:$LIB_PATH
               
-              # 执行构建
               python -m PyInstaller "$APP_NAME.spec" \
                 --distpath "/app/dist/$TARGET_PLATFORM" \
                 --workpath "/app/build/$TARGET_PLATFORM"
@@ -143,4 +136,74 @@ jobs:
         with:
           name: dist-linux-${{ env.TARGET_PLATFORM }}
           path: dist/${{ env.TARGET_PLATFORM }}
+          retention-days: 1
+
+  # 新增：构建Termux版本
+  build-termux:
+    name: 构建Termux版本
+    runs-on: ubuntu-latest
+    needs: [ get-version, build-frontend ]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+    strategy:
+      matrix:
+        arch: [ "aarch64", "arm" ]  # Termux常用架构
+          
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载前端
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: 在Termux Docker环境中构建
+        run: |
+          case "${{ matrix.arch }}" in
+            aarch64) DOCKER_ARCH="arm64" ;;
+            arm)     DOCKER_ARCH="arm/v7" ;;
+          esac
+          
+          docker run --rm \
+            --platform linux/$DOCKER_ARCH \
+            -v "$(pwd):/data/data/com.termux/files/home/taoSync" \
+            -w /data/data/com.termux/files/home/taoSync \
+            termux/termux-docker:$DOCKER_ARCH \
+            bash -c '
+              set -e
+              
+              echo "更新Termux包..."
+              pkg update -y && pkg upgrade -y
+              
+              echo "安装Python和构建依赖..."
+              pkg install -y python build-essential zlib zlib-static
+              
+              echo "安装Python依赖..."
+              python -m pip install --upgrade pip
+              
+              # 在Termux中，可能需要手动编译PyInstaller bootloader
+              echo "安装PyInstaller..."
+              python -m pip install "pyinstaller>=6,<7"
+              
+              echo "安装应用依赖..."
+              python -m pip install -r requirements.txt
+              
+              echo "执行构建..."
+              python -m PyInstaller "$APP_NAME.spec" \
+                --distpath "dist/termux-${{ matrix.arch }}" \
+                --workpath "build/termux-${{ matrix.arch }}"
+              
+              echo "构建完成！"
+              
+              # 检查生成的文件
+              ls -la dist/termux-${{ matrix.arch }}/
+            '
+                
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-termux-${{ matrix.arch }}
+          path: dist/termux-${{ matrix.arch }}
           retention-days: 1
