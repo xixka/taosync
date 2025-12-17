@@ -1,8 +1,6 @@
 name: 构建
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 env:
@@ -137,10 +135,14 @@ jobs:
                 --distpath "/app/dist/$TARGET_PLATFORM" \
                 --workpath "/app/build/$TARGET_PLATFORM"
             '
+      
+      - name: 打包为tar.gz
+        run: |
+          tar -czf "taoSync-linux-glibc-${{ env.TARGET_PLATFORM }}.tar.gz" -C "dist/${{ env.TARGET_PLATFORM }}" .
                 
       - name: 上传artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dist-linux-${{ env.TARGET_PLATFORM }}
-          path: dist/${{ env.TARGET_PLATFORM }}
+          name: taoSync-linux-glibc-${{ env.TARGET_PLATFORM }}
+          path: taoSync-linux-glibc-${{ env.TARGET_PLATFORM }}.tar.gz
           retention-days: 1
