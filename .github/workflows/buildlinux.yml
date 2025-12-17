@@ -63,7 +63,7 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        platform: [ "amd64", "arm64", "arm32" ]  # 添加 arm32 支持
+        platform: [ "amd64", "arm64", "arm32" ]
           
     steps:
       - name: 检出仓库代码
@@ -86,7 +86,7 @@ jobs:
           case "${{ matrix.platform }}" in
             amd64)   TARGET_ARCH="amd64" ;;
             arm64)   TARGET_ARCH="arm64" ;;
-            arm32)   TARGET_ARCH="arm/v7" ;;  # ARM 32-bit 使用 arm/v7
+            arm32)   TARGET_ARCH="arm/v7" ;;
           esac
           echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
           echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
@@ -101,7 +101,7 @@ jobs:
           case "${{ matrix.platform }}" in
             amd64)   BASE_IMAGE="python:3.11-slim-bullseye" ;;
             arm64)   BASE_IMAGE="arm64v8/python:3.11-slim-bullseye" ;;
-            arm32)   BASE_IMAGE="arm32v7/python:3.11-slim-bullseye" ;;  # ARM 32-bit 镜像
+            arm32)   BASE_IMAGE="arm32v7/python:3.11-slim-bullseye" ;;
           esac
           echo "使用兼容镜像: $BASE_IMAGE"
           
@@ -109,7 +109,7 @@ jobs:
           case "${{ matrix.platform }}" in
             amd64)   LIB_PATH="/usr/lib/x86_64-linux-gnu" ;;
             arm64)   LIB_PATH="/usr/lib/aarch64-linux-gnu" ;;
-            arm32)   LIB_PATH="/usr/lib/arm-linux-gnueabihf" ;;  # ARM 32-bit 库路径
+            arm32)   LIB_PATH="/usr/lib/arm-linux-gnueabihf" ;;
           esac
           
           docker run --rm \
@@ -129,8 +129,8 @@ jobs:
               # 添加库路径修复
               export LD_LIBRARY_PATH=/usr/local/lib:$LIB_PATH
               
-              # 执行构建
-              pyinstaller $APP_NAME.spec \
+              # 执行构建（使用 python -m PyInstaller 确保命令可用）
+              python -m PyInstaller $APP_NAME.spec \
                 --distpath /app/dist/${{ env.TARGET_PLATFORM }} \
                 --workpath /app/build/${{ env.TARGET_PLATFORM }}
             "
