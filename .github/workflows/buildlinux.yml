@@ -110,7 +110,6 @@ jobs:
             arm32)   LIB_PATH="/usr/lib/arm-linux-gnueabihf" ;;
           esac
           
-          # 使用 --build-arg 传递变量到容器内
           docker run --rm \
             --platform linux/${{ env.TARGET_ARCH }} \
             -v "$(pwd):/app" \
@@ -120,22 +119,15 @@ jobs:
             -e TARGET_PLATFORM=${{ env.TARGET_PLATFORM }} \
             $BASE_IMAGE \
             sh -c '
-              set -e  # 遇到错误立即退出
-              echo "Python路径: $(which python)"
-              echo "Python版本: $(python --version)"
+              set -e
               
-              # 安装构建依赖
-              apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
+              # 安装构建依赖 - 关键修改：添加 zlib1g-dev
+              apt-get update && apt-get install -y build-essential zlib1g-dev && rm -rf /var/lib/apt/lists/*
               
               # 使用 python -m pip 确保安装到正确的Python环境
               python -m pip install --upgrade pip
               python -m pip install "pyinstaller>=6,<7"
               python -m pip install -r requirements.txt
-              
-              # 验证PyInstaller安装
-              echo "验证PyInstaller安装:"
-              python -m pip show pyinstaller
-              python -m pip list | grep -i pyinstaller
               
               # 添加库路径修复
               export LD_LIBRARY_PATH=/usr/local/lib:$LIB_PATH
