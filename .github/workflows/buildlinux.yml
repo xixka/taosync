@@ -26,6 +26,7 @@ jobs:
           IFS=',' read -ra versionList <<< "$versions"
           cuVersion="${versionList[0]}"
           echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
+          
   build-frontend:
     name: 构建前端
     runs-on: ubuntu-latest
@@ -48,6 +49,7 @@ jobs:
           cd frontend
           npm install
           npm run build
+          
       - name: 上传artifact
         uses: actions/upload-artifact@v4
         with:
@@ -91,10 +93,6 @@ jobs:
           echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
           echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
           
-      - name: 创建构建目录
-        run: |
-          mkdir -p dist/${{ env.TARGET_PLATFORM }}
-          
       - name: 在Docker容器中构建
         run: |
           # 使用兼容旧系统的镜像
@@ -112,28 +110,41 @@ jobs:
             arm32)   LIB_PATH="/usr/lib/arm-linux-gnueabihf" ;;
           esac
           
+          # 使用 --build-arg 传递变量到容器内
           docker run --rm \
             --platform linux/${{ env.TARGET_ARCH }} \
             -v "$(pwd):/app" \
             -w /app \
+            -e APP_NAME=${{ env.APP_NAME }} \
+            -e LIB_PATH=$LIB_PATH \
+            -e TARGET_PLATFORM=${{ env.TARGET_PLATFORM }} \
             $BASE_IMAGE \
-            sh -c "
+            sh -c '
+              set -e  # 遇到错误立即退出
+              echo "Python路径: $(which python)"
+              echo "Python版本: $(python --version)"
+              
               # 安装构建依赖
               apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
               
-              # 安装Python依赖
-              pip install --upgrade pip
-              pip install 'pyinstaller>=6,<7'
-              pip install -r requirements.txt
+              # 使用 python -m pip 确保安装到正确的Python环境
+              python -m pip install --upgrade pip
+              python -m pip install "pyinstaller>=6,<7"
+              python -m pip install -r requirements.txt
+              
+              # 验证PyInstaller安装
+              echo "验证PyInstaller安装:"
+              python -m pip show pyinstaller
+              python -m pip list | grep -i pyinstaller
               
               # 添加库路径修复
               export LD_LIBRARY_PATH=/usr/local/lib:$LIB_PATH
               
-              # 执行构建（使用 python -m PyInstaller 确保命令可用）
-              python -m PyInstaller $APP_NAME.spec \
-                --distpath /app/dist/${{ env.TARGET_PLATFORM }} \
-                --workpath /app/build/${{ env.TARGET_PLATFORM }}
-            "
+              # 执行构建
+              python -m PyInstaller "$APP_NAME.spec" \
+                --distpath "/app/dist/$TARGET_PLATFORM" \
+                --workpath "/app/build/$TARGET_PLATFORM"
+            '
                 
       - name: 上传artifact
         uses: actions/upload-artifact@v4
