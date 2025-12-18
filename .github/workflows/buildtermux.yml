@@ -63,7 +63,7 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        platform: [ "amd64", "arm64", "arm32" ]
+        platform: [ "arm64", "arm32" ]  # 移除 amd64
           
     steps:
       - name: 检出仓库代码
@@ -84,7 +84,6 @@ jobs:
         id: set-platform
         run: |
           case "${{ matrix.platform }}" in
-            amd64)   TERMUX_TAG="x86_64" ;;
             arm64)   TERMUX_TAG="aarch64" ;;
             arm32)   TERMUX_TAG="arm" ;;
           esac
@@ -93,18 +92,8 @@ jobs:
             
       - name: 在Termux Docker容器中构建
         run: |
-          # 设置安全选项（非amd64平台需要特权模式）
-          SECURITY_OPT=""
-          if [[ "${{ matrix.platform }}" != "amd64" ]]; then
-            SECURITY_OPT="--privileged"
-            # 或者使用: SECURITY_OPT="--security-opt seccomp:unconfined"
-          fi
-          
-          echo "使用Termux镜像: termux/termux-docker:$TERMUX_TAG"
-          echo "安全选项: $SECURITY_OPT"
-          
-          docker run --rm \
-            $SECURITY_OPT \
+          # ARM架构在x86主机上需要特权模式
+          docker run --rm --privileged \
             -v "$(pwd):/app" \
             -w /app \
             -e APP_NAME=${{ env.APP_NAME }} \
@@ -113,9 +102,9 @@ jobs:
             sh -c '
               set -e
               
-              # 更新包列表并安装必要依赖
+              # 更新并安装依赖（修复包名）
               pkg update -y
-              pkg install -y python build-essential zlib zlib-dev
+              pkg install -y python python-pip build-essential zlib
               
               # 升级pip并安装Python依赖
               pip install --upgrade pip
