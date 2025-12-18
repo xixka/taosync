@@ -75,20 +75,40 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
+      # 关键修复：添加QEMU跨平台支持
+      - name: 设置QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
       - name: 设置目标平台变量
         id: set-platform
         run: |
           case "${{ matrix.platform }}" in
-            aarch64) TERMUX_ARCH="aarch64" ;;
-            arm)     TERMUX_ARCH="arm" ;;
-            i686)    TERMUX_ARCH="i686" ;;
-            x86_64)  TERMUX_ARCH="x86_64" ;;
+            aarch64) 
+              TERMUX_ARCH="aarch64"
+              DOCKER_PLATFORM="linux/arm64"
+              ;;
+            arm)     
+              TERMUX_ARCH="arm"
+              DOCKER_PLATFORM="linux/arm/v7"
+              ;;
+            i686)    
+              TERMUX_ARCH="i686"
+              DOCKER_PLATFORM="linux/386"
+              ;;
+            x86_64)  
+              TERMUX_ARCH="x86_64"
+              DOCKER_PLATFORM="linux/amd64"
+              ;;
           esac
           echo "TERMUX_ARCH=$TERMUX_ARCH" >> $GITHUB_ENV
+          echo "DOCKER_PLATFORM=$DOCKER_PLATFORM" >> $GITHUB_ENV
           
       - name: 在Termux容器中构建
         run: |
           docker run --rm \
+            --platform ${{ env.DOCKER_PLATFORM }} \  # 关键修复：明确指定平台
             -v "$(pwd):/app" \
             -w /app \
             -e APP_NAME=${{ env.APP_NAME }} \
