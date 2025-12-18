@@ -1,4 +1,4 @@
-name: buildtermux
+name: buildglibclinux
 
 on:
   workflow_dispatch:
@@ -84,20 +84,21 @@ jobs:
         id: set-platform
         run: |
           case "${{ matrix.platform }}" in
-            arm64)   TARGET_ARCH="arm64" ;;
-            arm32)   TARGET_ARCH="arm32" ;;
+            arm64)   TARGET_ARCH="arm64"; TERMUX_TAG="aarch64" ;;
+            arm32)   TARGET_ARCH="arm32"; TERMUX_TAG="arm" ;;
           esac
           echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
           echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
+          echo "TERMUX_TAG=$TERMUX_TAG" >> $GITHUB_ENV
 
       - name: 在Termux容器中构建
         run: |
-          # 使用Termux官方Docker镜像
-          BASE_IMAGE="termux/termux-docker:latest"
+          BASE_IMAGE="termux/termux-docker:${{ env.TERMUX_TAG }}"
           echo "使用Termux镜像: $BASE_IMAGE"
 
           docker run --rm \
             --platform linux/${{ env.TARGET_ARCH }} \
+            --privileged \
             -v "$(pwd):/app" \
             -w /app \
             -e APP_NAME=${{ env.APP_NAME }} \
@@ -145,7 +146,7 @@ jobs:
           if [ -d "dist/termux-${{ env.TARGET_PLATFORM }}" ]; then
             tar -czf "taoSync-termux-${{ env.TARGET_PLATFORM }}.tar.gz" -C "dist/termux-${{ env.TARGET_PLATFORM }}" .
           else
-            echo "Termux构建目录不存在，可能构建失败"
+            echo "构建目录不存在，可能构建失败"
             exit 1
           fi
 
