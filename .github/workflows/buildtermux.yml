@@ -63,7 +63,8 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        platform: [ "aarch64", "arm", "i686", "x86_64" ]
+        # 只保留ARM平台，移除x86平台
+        platform: [ "aarch64", "arm" ]
           
     steps:
       - name: 检出仓库代码
@@ -75,7 +76,7 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      # 关键修复：添加QEMU跨平台支持
+      # QEMU跨平台支持
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -93,22 +94,15 @@ jobs:
               TERMUX_ARCH="arm"
               DOCKER_PLATFORM="linux/arm/v7"
               ;;
-            i686)    
-              TERMUX_ARCH="i686"
-              DOCKER_PLATFORM="linux/386"
-              ;;
-            x86_64)  
-              TERMUX_ARCH="x86_64"
-              DOCKER_PLATFORM="linux/amd64"
-              ;;
           esac
           echo "TERMUX_ARCH=$TERMUX_ARCH" >> $GITHUB_ENV
           echo "DOCKER_PLATFORM=$DOCKER_PLATFORM" >> $GITHUB_ENV
           
       - name: 在Termux容器中构建
         run: |
+          # 修复命令格式错误：移除多余的反斜杠和空格
           docker run --rm \
-            --platform ${{ env.DOCKER_PLATFORM }} \  # 关键修复：明确指定平台
+            --platform ${{ env.DOCKER_PLATFORM }} \
             -v "$(pwd):/app" \
             -w /app \
             -e APP_NAME=${{ env.APP_NAME }} \
