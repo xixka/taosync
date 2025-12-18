@@ -106,14 +106,10 @@ jobs:
             sh -c '
               set -e
               
-              # 1. 强制设置为非交互模式，解决 openssl 等配置文件弹窗问题
-              export DEBIAN_FRONTEND=noninteractive
-              alias pkg="pkg -o Dpkg::Options::=\"--force-confold\""
-              
               # 2. 更新系统并安装基础包
               pkg update -y
               pkg upgrade -y
-              pkg install -y python python-pip build-essential zlib libcrypt openssl libffi
+              pkg install -y python python-pip build-essential zlib libcrypt libffi
               
               # 3. 修复并升级 pip
               python3 -m ensurepip --upgrade
