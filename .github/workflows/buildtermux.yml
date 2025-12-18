@@ -1,147 +1,70 @@
-name: buildtermux
+build-linux:
+  name: 构建Termux多平台
+  runs-on: ubuntu-latest
+  needs: [ get-version, build-frontend ]
+  env:
+    VERSION: ${{ needs.get-version.outputs.VERSION }}
+  strategy:
+    matrix:
+      platform: [ "aarch64", "arm", "i686", "x86_64" ]
+        
+  steps:
+    - name: 检出仓库代码
+      uses: actions/checkout@v4
 
-on:
-  workflow_dispatch:
+    - name: 下载前端
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-dist
+        path: frontend/dist
 
-env:
-  APP_NAME: taoSync
-
-jobs:
-  get-version:
-    name: 获取版本号
-    runs-on: ubuntu-latest
-    outputs:
-      VERSION: ${{ steps.getVersion.outputs.VERSION }}
-
-    steps:
-      - name: 检出仓库代码
-        uses: actions/checkout@v4
-
-      - id: getVersion
-        name: 获取版本号
-        run: |
-          # 获取版本号逻辑
-          if [ -f version.txt ]; then
-            versions=$(head -n 1 version.txt)
-            IFS=',' read -ra versionList <<< "$versions"
-            cuVersion="${versionList[0]}"
-            echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
-          else
-            echo "VERSION=1.0.0" >> "$GITHUB_OUTPUT"
-          fi
-          
-  build-frontend:
-    name: 构建前端
-    runs-on: ubuntu-latest
-    needs: [ get-version ]
-    env:
-      VERSION: ${{ needs.get-version.outputs.VERSION }}
-
-    steps:
-      - name: 检出仓库代码
-        uses: actions/checkout@v4
-
-      - name: 安装Node.js 14.x
-        uses: actions/setup-node@v4
-        with:
-          node-version: "14.x"
-
-      - name: 安装依赖并构建前端
-        run: |
-          sed -i "s/__version_placeholder__/$VERSION/g" frontend/src/views/page/setting/index.vue || true
-          cd frontend
-          npm install
-          npm run build
-          
-      - name: 上传产物
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
-          retention-days: 1
-
-  build-termux:
-    name: 构建Termux多平台
-    runs-on: ubuntu-latest
-    needs: [ get-version, build-frontend ]
-    env:
-      VERSION: ${{ needs.get-version.outputs.VERSION }}
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [ "arm64", "arm32" ]
-          
-    steps:
-      - name: 检出仓库代码
-        uses: actions/checkout@v4
-
-      - name: 下载前端
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
-
-      - name: 设置QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: all
-
-      - name: 设置目标平台变量
-        id: set-platform
-        run: |
-          case "${{ matrix.platform }}" in
-            arm64)   echo "TERMUX_TAG=aarch64" >> $GITHUB_ENV ;;
-            arm32)   echo "TERMUX_TAG=arm" >> $GITHUB_ENV ;;
-          esac
-          echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
+    - name: 设置目标平台变量
+      id: set-platform
+      run: |
+        case "${{ matrix.platform }}" in
+          aarch64) TERMUX_ARCH="aarch64" ;;
+          arm)     TERMUX_ARCH="arm" ;;
+          i686)    TERMUX_ARCH="i686" ;;
+          x86_64)  TERMUX_ARCH="x86_64" ;;
+        esac
+        echo "TERMUX_ARCH=$TERMUX_ARCH" >> $GITHUB_ENV
+        
+    - name: 在Termux容器中构建
+      run: |
+        docker run --rm \
+          -v "$(pwd):/app" \
+          -w /app \
+          -e APP_NAME=${{ env.APP_NAME }} \
+          -e TERMUX_ARCH=${{ env.TERMUX_ARCH }} \
+          termux/termux-docker:${{ env.TERMUX_ARCH }} \
+          sh -c '
+            set -e
             
-      - name: 在Termux Docker容器中构建
-        run: |
-          docker run --rm --privileged \
-            -v "$(pwd):/app" \
-            -w /app \
-            -e APP_NAME=${{ env.APP_NAME }} \
-            -e TARGET_PLATFORM=${{ env.TARGET_PLATFORM }} \
-            termux/termux-docker:${{ env.TERMUX_TAG }} \
-            sh -c '
-              set -e
+            # 更新包索引并安装依赖
+            pkg update -y
+            pkg install -y python build-essential zlib
+            
+            # 安装Python依赖
+            pip install --upgrade pip
+            pip install "pyinstaller>=6,<7"
+            pip install -r requirements.txt
+            
+            # 特殊环境配置
+            export LD_LIBRARY_PATH=$PREFIX/lib
+            
+            # 执行构建
+            python -m PyInstaller "$APP_NAME.spec" \
+              --distpath "/app/dist/$TERMUX_ARCH" \
+              --workpath "/app/build/$TERMUX_ARCH"
+          '
+  
+    - name: 打包为tar.gz
+      run: |
+        tar -czf "taoSync-termux-${{ env.TERMUX_ARCH }}.tar.gz" -C "dist/${{ env.TERMUX_ARCH }}" .
               
-              # 2. 更新系统并安装基础包
-              pkg update -y
-              pkg upgrade -y
-              pkg install -y python python-pip build-essential zlib libcrypt libffi
-              
-              # 3. 修复并升级 pip
-              python3 -m ensurepip --upgrade
-              python3 -m pip install --upgrade pip
-              
-              # 4. 安装 Python 依赖库
-              # 如果编译报错，可能需要 pkg install 更多底层库（如 libjpeg-turbo, libpng 等）
-              python3 -m pip install "pyinstaller>=6,<7"
-              if [ -f requirements.txt ]; then
-                python3 -m pip install -r requirements.txt
-              fi
-              
-              # 5. 执行 PyInstaller 打包
-              python3 -m PyInstaller "$APP_NAME.spec" \
-                --distpath "/app/dist/$TARGET_PLATFORM" \
-                --workpath "/app/build/$TARGET_PLATFORM" \
-                --clean \
-                --noconfirm
-            '
-      
-      - name: 打包为tar.gz
-        run: |
-          if [ -d "dist/${{ env.TARGET_PLATFORM }}" ]; then
-            tar -czf "taoSync-termux-${{ env.TARGET_PLATFORM }}.tar.gz" -C "dist/${{ env.TARGET_PLATFORM }}" .
-          else
-            echo "Build failed, dist directory not found"
-            exit 1
-          fi
-                
-      - name: 上传结果
-        uses: actions/upload-artifact@v4
-        with:
-          name: taoSync-termux-${{ env.TARGET_PLATFORM }}
-          path: taoSync-termux-${{ env.TARGET_PLATFORM }}.tar.gz
-          retention-days: 5
+    - name: 上传artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: taoSync-termux-${{ env.TERMUX_ARCH }}
+        path: taoSync-termux-${{ env.TERMUX_ARCH }}.tar.gz
+        retention-days: 1
