@@ -63,7 +63,6 @@ jobs:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        # 只保留ARM平台，移除x86平台
         platform: [ "aarch64", "arm" ]
           
     steps:
@@ -76,7 +75,6 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      # QEMU跨平台支持
       - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
         with:
@@ -100,7 +98,6 @@ jobs:
           
       - name: 在Termux容器中构建
         run: |
-          # 修复命令格式错误：移除多余的反斜杠和空格
           docker run --rm \
             --platform ${{ env.DOCKER_PLATFORM }} \
             -v "$(pwd):/app" \
@@ -110,10 +107,11 @@ jobs:
             termux/termux-docker:${{ env.TERMUX_ARCH }} \
             sh -c '
               set -e
-              
+              # 手动指定镜像源
+              echo "deb https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main stable main" > $PREFIX/etc/apt/sources.list
               # 更新包索引并安装依赖
-              pkg update -y
-              pkg install -y python build-essential zlib
+              apt-get update -y
+              apt-get install -y python build-essential zlib
               
               # 安装Python依赖
               pip install --upgrade pip
