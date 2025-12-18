@@ -1,4 +1,4 @@
-name: buildglibclinux
+name: buildtermux
 
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
           IFS=',' read -ra versionList <<< "$versions"
           cuVersion="${versionList[0]}"
           echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
-
+          
   build-frontend:
     name: 构建前端
     runs-on: ubuntu-latest
@@ -47,7 +47,7 @@ jobs:
           cd frontend
           npm install
           npm run build
-
+          
       - name: 上传artifact
         uses: actions/upload-artifact@v4
         with:
@@ -56,15 +56,15 @@ jobs:
           retention-days: 1
 
   build-termux:
-    name: 构建Termux (Android)
+    name: 构建Termux多平台
     runs-on: ubuntu-latest
     needs: [ get-version, build-frontend ]
     env:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     strategy:
       matrix:
-        platform: [ "arm64", "arm32" ]
-
+        platform: [ "amd64", "arm64", "arm32" ]
+          
     steps:
       - name: 检出仓库代码
         uses: actions/checkout@v4
@@ -84,70 +84,54 @@ jobs:
         id: set-platform
         run: |
           case "${{ matrix.platform }}" in
-            arm64)   TARGET_ARCH="arm64"; PLATFORM="linux/arm64"; TERMUX_TAG="aarch64" ;;
-            arm32)   TARGET_ARCH="arm32"; PLATFORM="linux/arm/v7"; TERMUX_TAG="arm" ;;
+            amd64)   TERMUX_TAG="x86_64" ;;
+            arm64)   TERMUX_TAG="aarch64" ;;
+            arm32)   TERMUX_TAG="arm" ;;
           esac
-          echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
-          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-          echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
           echo "TERMUX_TAG=$TERMUX_TAG" >> $GITHUB_ENV
-
-      - name: 在Termux容器中构建后端
+          echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
+            
+      - name: 在Termux Docker容器中构建
         run: |
-          BASE_IMAGE="termux/termux-docker:${{ env.TERMUX_TAG }}"
-          echo "使用Termux镜像: $BASE_IMAGE"
-          echo "平台: ${{ env.PLATFORM }}"
-
+          # 设置安全选项（非amd64平台需要特权模式）
+          SECURITY_OPT=""
+          if [[ "${{ matrix.platform }}" != "amd64" ]]; then
+            SECURITY_OPT="--privileged"
+            # 或者使用: SECURITY_OPT="--security-opt seccomp:unconfined"
+          fi
+          
+          echo "使用Termux镜像: termux/termux-docker:$TERMUX_TAG"
+          echo "安全选项: $SECURITY_OPT"
+          
           docker run --rm \
-            --platform ${{ env.PLATFORM }} \
-            --privileged \
+            $SECURITY_OPT \
             -v "$(pwd):/app" \
             -w /app \
             -e APP_NAME=${{ env.APP_NAME }} \
-            -e VERSION=${{ env.VERSION }} \
             -e TARGET_PLATFORM=${{ env.TARGET_PLATFORM }} \
-            $BASE_IMAGE \
+            termux/termux-docker:$TERMUX_TAG \
             sh -c '
               set -e
-
-              # Termux环境特殊设置
-              export TMPDIR=/data/local/tmp
-              export PATH=/data/data/com.termux/files/usr/bin:$PATH
-
-              # 更新包管理器并安装Python（跳过nodejs）
-              pkg update -y || true
-              pkg install -y python git build-essential clang
-
-              # 安装Python依赖
+              
+              # 更新包列表并安装必要依赖
+              pkg update -y
+              pkg install -y python build-essential zlib zlib-dev
+              
+              # 升级pip并安装Python依赖
               pip install --upgrade pip
               pip install "pyinstaller>=6,<7"
               pip install -r requirements.txt
-
-              # 安装系统库
-              pkg install -y libffi libjpeg-turbo libpng zlib -y || true
-
-              # 前端已构建好，只需确保dist存在
-              if [ ! -d "frontend/dist" ]; then
-                echo "错误: frontend/dist 不存在"
-                exit 1
-              fi
-
-              # 使用PyInstaller构建
+              
+              # 执行构建
               python -m PyInstaller "$APP_NAME.spec" \
-                --distpath "/app/dist/termux-$TARGET_PLATFORM" \
-                --workpath "/app/build/termux-$TARGET_PLATFORM" \
-                --clean
+                --distpath "/app/dist/$TARGET_PLATFORM" \
+                --workpath "/app/build/$TARGET_PLATFORM"
             '
-
+      
       - name: 打包为tar.gz
         run: |
-          if [ -d "dist/termux-${{ env.TARGET_PLATFORM }}" ]; then
-            tar -czf "taoSync-termux-${{ env.TARGET_PLATFORM }}.tar.gz" -C "dist/termux-${{ env.TARGET_PLATFORM }}" .
-          else
-            echo "构建目录不存在，可能构建失败"
-            exit 1
-          fi
-
+          tar -czf "taoSync-termux-${{ env.TARGET_PLATFORM }}.tar.gz" -C "dist/${{ env.TARGET_PLATFORM }}" .
+                
       - name: 上传artifact
         uses: actions/upload-artifact@v4
         with:
