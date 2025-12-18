@@ -92,7 +92,7 @@ jobs:
           echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
           echo "TERMUX_TAG=$TERMUX_TAG" >> $GITHUB_ENV
 
-      - name: 在Termux容器中构建
+      - name: 在Termux容器中构建后端
         run: |
           BASE_IMAGE="termux/termux-docker:${{ env.TERMUX_TAG }}"
           echo "使用Termux镜像: $BASE_IMAGE"
@@ -114,9 +114,9 @@ jobs:
               export TMPDIR=/data/local/tmp
               export PATH=/data/data/com.termux/files/usr/bin:$PATH
 
-              # 更新包管理器并安装依赖
-              pkg update -y
-              pkg install -y python nodejs git build-essential clang
+              # 更新包管理器并安装Python（跳过nodejs）
+              pkg update -y || true
+              pkg install -y python git build-essential clang
 
               # 安装Python依赖
               pip install --upgrade pip
@@ -124,16 +124,13 @@ jobs:
               pip install -r requirements.txt
 
               # 安装系统库
-              pkg install -y libffi libjpeg-turbo libpng zlib -y
+              pkg install -y libffi libjpeg-turbo libpng zlib -y || true
 
-              # 替换版本占位符
-              sed -i "s/__version_placeholder__/$VERSION/g" frontend/src/views/page/setting/index.vue
-
-              # 构建前端
-              cd frontend
-              npm install
-              npm run build
-              cd ..
+              # 前端已构建好，只需确保dist存在
+              if [ ! -d "frontend/dist" ]; then
+                echo "错误: frontend/dist 不存在"
+                exit 1
+              fi
 
               # 使用PyInstaller构建
               python -m PyInstaller "$APP_NAME.spec" \
@@ -141,7 +138,6 @@ jobs:
                 --workpath "/app/build/termux-$TARGET_PLATFORM" \
                 --clean
             '
-        continue-on-error: true
 
       - name: 打包为tar.gz
         run: |
