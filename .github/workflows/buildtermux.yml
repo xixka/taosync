@@ -20,11 +20,15 @@ jobs:
       - id: getVersion
         name: 获取版本号
         run: |
-          # 假设 version.txt 第一行是版本号
-          versions=$(head -n 1 version.txt)
-          IFS=',' read -ra versionList <<< "$versions"
-          cuVersion="${versionList[0]}"
-          echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
+          # 获取版本号逻辑
+          if [ -f version.txt ]; then
+            versions=$(head -n 1 version.txt)
+            IFS=',' read -ra versionList <<< "$versions"
+            cuVersion="${versionList[0]}"
+            echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
+          else
+            echo "VERSION=1.0.0" >> "$GITHUB_OUTPUT"
+          fi
           
   build-frontend:
     name: 构建前端
@@ -44,13 +48,12 @@ jobs:
 
       - name: 安装依赖并构建前端
         run: |
-          # 替换版本占位符
-          sed -i "s/__version_placeholder__/$VERSION/g" frontend/src/views/page/setting/index.vue
+          sed -i "s/__version_placeholder__/$VERSION/g" frontend/src/views/page/setting/index.vue || true
           cd frontend
           npm install
           npm run build
           
-      - name: 上传前端产物
+      - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
@@ -72,13 +75,13 @@ jobs:
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
-      - name: 下载前端产物
+      - name: 下载前端
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
           path: frontend/dist
 
-      - name: 设置QEMU (用于跨架构运行)
+      - name: 设置QEMU
         uses: docker/setup-qemu-action@v3
         with:
           platforms: all
@@ -94,7 +97,6 @@ jobs:
             
       - name: 在Termux Docker容器中构建
         run: |
-          # 使用特权模式运行以支持二进制翻译
           docker run --rm --privileged \
             -v "$(pwd):/app" \
             -w /app \
@@ -104,22 +106,27 @@ jobs:
             sh -c '
               set -e
               
-              # 1. 更新环境并安装必要系统库 (libcrypt 是 Python 3.12 的关键)
+              # 1. 强制设置为非交互模式，解决 openssl 等配置文件弹窗问题
+              export DEBIAN_FRONTEND=noninteractive
+              alias pkg="pkg -o Dpkg::Options::=\"--force-confold\""
+              
+              # 2. 更新系统并安装基础包
               pkg update -y
               pkg upgrade -y
-              pkg install -y python python-pip build-essential zlib libcrypt
+              pkg install -y python python-pip build-essential zlib libcrypt openssl libffi
               
-              # 2. 修复并升级 pip 环境
+              # 3. 修复并升级 pip
               python3 -m ensurepip --upgrade
               python3 -m pip install --upgrade pip
               
-              # 3. 安装项目依赖
-              # 如果 requirements.txt 中有需要编译的包，build-essential 已经安装
+              # 4. 安装 Python 依赖库
+              # 如果编译报错，可能需要 pkg install 更多底层库（如 libjpeg-turbo, libpng 等）
               python3 -m pip install "pyinstaller>=6,<7"
-              python3 -m pip install -r requirements.txt
+              if [ -f requirements.txt ]; then
+                python3 -m pip install -r requirements.txt
+              fi
               
-              # 4. 执行 PyInstaller 构建
-              # --clean 确保不使用之前的缓存
+              # 5. 执行 PyInstaller 打包
               python3 -m PyInstaller "$APP_NAME.spec" \
                 --distpath "/app/dist/$TARGET_PLATFORM" \
                 --workpath "/app/build/$TARGET_PLATFORM" \
@@ -127,11 +134,16 @@ jobs:
                 --noconfirm
             '
       
-      - name: 打包为 tar.gz
+      - name: 打包为tar.gz
         run: |
-          tar -czf "taoSync-termux-${{ env.TARGET_PLATFORM }}.tar.gz" -C "dist/${{ env.TARGET_PLATFORM }}" .
+          if [ -d "dist/${{ env.TARGET_PLATFORM }}" ]; then
+            tar -czf "taoSync-termux-${{ env.TARGET_PLATFORM }}.tar.gz" -C "dist/${{ env.TARGET_PLATFORM }}" .
+          else
+            echo "Build failed, dist directory not found"
+            exit 1
+          fi
                 
-      - name: 上传构建结果
+      - name: 上传结果
         uses: actions/upload-artifact@v4
         with:
           name: taoSync-termux-${{ env.TARGET_PLATFORM }}
