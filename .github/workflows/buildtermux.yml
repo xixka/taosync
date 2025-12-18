@@ -84,10 +84,11 @@ jobs:
         id: set-platform
         run: |
           case "${{ matrix.platform }}" in
-            arm64)   TARGET_ARCH="arm64"; TERMUX_TAG="aarch64" ;;
-            arm32)   TARGET_ARCH="arm32"; TERMUX_TAG="arm" ;;
+            arm64)   TARGET_ARCH="arm64"; PLATFORM="linux/arm64"; TERMUX_TAG="aarch64" ;;
+            arm32)   TARGET_ARCH="arm32"; PLATFORM="linux/arm/v7"; TERMUX_TAG="arm" ;;
           esac
           echo "TARGET_ARCH=$TARGET_ARCH" >> $GITHUB_ENV
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
           echo "TARGET_PLATFORM=${{ matrix.platform }}" >> $GITHUB_ENV
           echo "TERMUX_TAG=$TERMUX_TAG" >> $GITHUB_ENV
 
@@ -95,9 +96,10 @@ jobs:
         run: |
           BASE_IMAGE="termux/termux-docker:${{ env.TERMUX_TAG }}"
           echo "使用Termux镜像: $BASE_IMAGE"
+          echo "平台: ${{ env.PLATFORM }}"
 
           docker run --rm \
-            --platform linux/${{ env.TARGET_ARCH }} \
+            --platform ${{ env.PLATFORM }} \
             --privileged \
             -v "$(pwd):/app" \
             -w /app \
