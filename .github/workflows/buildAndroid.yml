@@ -67,7 +67,7 @@ jobs:
       - name: 安装 Buildozer 与 python-for-android
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "buildozer>=1.5.0" "python-for-android>=2024.1.21" "Cython<3.1,>=0.29.36" virtualenv
+          python -m pip install "buildozer==1.5.0" "python-for-android==2024.01.21" "Cython==0.29.37" virtualenv==20.25.0
 
       - name: 缓存 Buildozer 全局目录
         uses: actions/cache@v4
@@ -76,18 +76,40 @@ jobs:
             ~/.buildozer
             ~/.gradle
             /opt/android-sdk
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+          key: buildozer-v2-${{ runner.os }}-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
           restore-keys: |
-            buildozer-${{ runner.os }}-
+            buildozer-v2-${{ runner.os }}-
 
-      - name: 检查 buildozer.spec 是否存在
+      - name: 检查 buildozer.spec 是否存在，不存在则创建默认配置
         id: checkSpec
         run: |
-          if [ -f "$BUILDOZER_SPEC" ]; then
+          if [ ! -f "$BUILDOZER_SPEC" ]; then
+            echo "::warning::未找到 $BUILDOZER_SPEC，自动创建默认配置"
+            cat > "$BUILDOZER_SPEC" << 'EOF'
+[app]
+title = taoSync
+package.name = taosync
+package.domain = org.taofang
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas
+version = 0.1
+requirements = python3==3.11.9,kivy==2.3.0,sdl2,tornado,requests,APScheduler,configparser,pathspec
+orientation = portrait
+fullscreen = 0
+android.api = 33
+android.ndk = 25b
+android.sdk = 24
+android.archs = arm64-v8a, armeabi-v7a
+android.permissions = INTERNET,ACCESS_NETWORK_STATE
+android.logcat_filters = *:S python:D
+android.allow_backup = True
+[buildozer]
+log_level = 2
+warn_on_root = 1
+EOF
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::未找到 $BUILDOZER_SPEC，跳过 APK 构建。请先在仓库根目录创建 buildozer.spec"
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: 注入版本号到 buildozer.spec
@@ -96,9 +118,54 @@ jobs:
           sed -i "s/^version = .*/version = $VERSION/" "$BUILDOZER_SPEC"
           grep -E "^version" "$BUILDOZER_SPEC" || true
 
-      - name: 编译 Android Debug APK
+      - name: 强制设置稳定依赖版本
         if: steps.checkSpec.outputs.exists == 'true'
-        run: buildozer android debug
+        run: |
+          if grep -q "^requirements" "$BUILDOZER_SPEC"; then
+            existing_reqs=$(grep "^requirements" "$BUILDOZER_SPEC" | head -n 1 | sed 's/requirements = //')
+            echo "原始 requirements: $existing_reqs"
+            new_reqs=$(echo "$existing_reqs" | sed -E 's/(^|,)python3(==[^,]*)?/\1python3==3.11.9/g')
+            if [[ "$new_reqs" != *"python3==3.11.9"* ]]; then
+              new_reqs="python3==3.11.9,$new_reqs"
+            fi
+            new_reqs=$(echo "$new_reqs" | sed -E 's/(^|,)kivy(==[^,]*)?/\1kivy==2.3.0/g')
+            if [[ "$new_reqs" != *"kivy=="* ]]; then
+              new_reqs="$new_reqs,kivy==2.3.0"
+            fi
+            if [[ "$new_reqs" != *",sdl2"* ]] && [[ "$new_reqs" != "sdl2"* ]] && [[ "$new_reqs" != *",sdl2,"* ]]; then
+              new_reqs="$new_reqs,sdl2"
+            fi
+            new_reqs=$(echo "$new_reqs" | sed 's/^,//' | sed 's/,,*/,/g')
+            sed -i "s/^requirements = .*/requirements = $new_reqs/" "$BUILDOZER_SPEC"
+          else
+            echo "requirements = python3==3.11.9,kivy==2.3.0,sdl2" >> "$BUILDOZER_SPEC"
+          fi
+          if ! grep -q "^android.api" "$BUILDOZER_SPEC"; then
+            echo "android.api = 33" >> "$BUILDOZER_SPEC"
+          else
+            sed -i "s/^android.api = .*/android.api = 33/" "$BUILDOZER_SPEC"
+          fi
+          if ! grep -q "^android.ndk" "$BUILDOZER_SPEC"; then
+            echo "android.ndk = 25b" >> "$BUILDOZER_SPEC"
+          else
+            sed -i "s/^android.ndk = .*/android.ndk = 25b/" "$BUILDOZER_SPEC"
+          fi
+          if ! grep -q "^android.sdk" "$BUILDOZER_SPEC"; then
+            echo "android.sdk = 24" >> "$BUILDOZER_SPEC"
+          else
+            sed -i "s/^android.sdk = .*/android.sdk = 24/" "$BUILDOZER_SPEC"
+          fi
+          if ! grep -q "^android.archs" "$BUILDOZER_SPEC"; then
+            echo "android.archs = arm64-v8a, armeabi-v7a" >> "$BUILDOZER_SPEC"
+          fi
+          echo "=== 配置检查 ==="
+          grep -E "^(requirements|android\.(api|ndk|sdk|archs))" "$BUILDOZER_SPEC" || true
+
+      - name: 清理并编译 Android Debug APK
+        if: steps.checkSpec.outputs.exists == 'true'
+        run: |
+          buildozer android clean
+          buildozer android debug
 
       - name: 重命名 APK
         if: steps.checkSpec.outputs.exists == 'true'
