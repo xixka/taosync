@@ -1,9 +1,6 @@
-name: 构建Android
+name: build安卓
 
 on:
-  push:
-    branches: [ 'main' ]
-    paths: [ 'version.txt' ]
   workflow_dispatch:
 
 env:
