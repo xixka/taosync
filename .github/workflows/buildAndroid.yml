@@ -28,11 +28,41 @@ jobs:
           IFS=',' read -ra versionList <<< "$versions"
           cuVersion="${versionList[0]}"
           echo "VERSION=$cuVersion" >> "$GITHUB_OUTPUT"
+  build-frontend:
+    name: 构建前端
+    runs-on: ubuntu-latest
+    needs: [ get-version ]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+    # 仅在非 dev 版本构建
+    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 安装Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "14.x"
+
+      - name: 注入版本号并构建前端
+        run: |
+          sed -i "s/__version_placeholder__/$VERSION/g" frontend/src/views/page/setting/index.vue
+          cd frontend
+          npm install
+          npm run build
+      - name: 上传artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
 
   build-android:
     name: 构建android
     runs-on: ubuntu-latest
-    needs: [ get-version ]
+    needs: [ get-version, build-frontend ]
     env:
       VERSION: ${{ needs.get-version.outputs.VERSION }}
     # 仅在非 dev 版本构建 apk
@@ -42,10 +72,21 @@ jobs:
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
+      - name: 下载前端构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: 准备前端资源 front/
+        run: |
+          # 桌面端 PyInstaller 将 frontend/dist 映射为 front/，Android 保持一致
+          cp -r frontend/dist front
+          ls front/index.html
       - name: 设置python环境
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: 安装系统依赖
         run: |
@@ -55,20 +96,25 @@ jobs:
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             libffi-dev libssl-dev libsqlite3-dev libbz2-dev libreadline-dev \
             libportaudio2 libportaudiocpp0 \
+            libltdl-dev libtool-bin \
             ccache git wget unzip zip \
             openjdk-17-jdk build-essential
           sudo ln -sf /usr/bin/python3 /usr/bin/python
-
+          # libffi 的 configure.ac 用到 LT_SYS_SYMBOL_USCORE 等宏，
+          # 需让 autoconf 能找到 libtool 提供的 m4 文件，否则 autoreconf 失败。
+          echo "ACLOCAL_PATH=/usr/share/aclocal" >> $GITHUB_ENV
+          autoreconf --version
+          libtool --version
       - name: 配置Java环境变量
         run: |
           echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
           echo "$JAVA_HOME/bin" >> $GITHUB_PATH
-
       - name: 安装 Buildozer 与 python-for-android
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "buildozer==1.5.0" "python-for-android==2024.01.21" "Cython==0.29.37" virtualenv==20.25.0
-
+          # 固定使用 p4a 稳定版（master 分支，支持 Python 3.12）
+          # 避免装到 develop 分支导致编译出 Python 3.14 运行时（项目依赖不兼容 3.14）
+          python -m pip install "buildozer==1.5.0" "python-for-android==2024.01.21" "Cython==0.29.36" virtualenv
       - name: 缓存 Buildozer 全局目录
         uses: actions/cache@v4
         with:
@@ -76,96 +122,61 @@ jobs:
             ~/.buildozer
             ~/.gradle
             /opt/android-sdk
-          key: buildozer-v2-${{ runner.os }}-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+          key: buildozer-${{ runner.os }}-py312-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
           restore-keys: |
-            buildozer-v2-${{ runner.os }}-
-
-      - name: 检查 buildozer.spec 是否存在，不存在则创建默认配置
+            buildozer-${{ runner.os }}-py312-
+      - name: 清理旧构建产物（避免复用 Python 3.14 脏缓存）
+        run: |
+          # buildozer 实际把 p4a 源码与编译产物放在 HOME 目录的 ~/.buildozer 下，
+          # 缓存恢复后这里会残留旧 develop 分支构建的 Python 3.14 产物，
+          # 必须清掉才会重新克隆 p4a master 并编译 Python 3.12。
+          rm -rf ~/.buildozer/android/platform/build-* 2>/dev/null || true
+          rm -rf ~/.buildozer/android/platform/python-for-android 2>/dev/null || true
+          # 兜底：清理本地工作目录（部分 buildozer 版本会用本地 .buildozer）
+          rm -rf .buildozer/android/platform/build-* 2>/dev/null || true
+          rm -rf .buildozer/android/platform/python-for-android 2>/dev/null || true
+          echo "已清理 ~/.buildozer 与本地 .buildozer 下的 p4a 源码及编译产物"
+      - name: 检查 buildozer.spec 是否存在
         id: checkSpec
         run: |
-          if [ ! -f "$BUILDOZER_SPEC" ]; then
-            echo "::warning::未找到 $BUILDOZER_SPEC，自动创建默认配置"
-            printf '%s\n' \
-              '[app]' \
-              'title = taoSync' \
-              'package.name = taosync' \
-              'package.domain = org.taofang' \
-              'source.dir = .' \
-              'source.include_exts = py,png,jpg,kv,atlas' \
-              'version = 0.1' \
-              'requirements = python3==3.11.9,kivy==2.3.0,sdl2,tornado,requests,APScheduler,configparser,pathspec' \
-              'orientation = portrait' \
-              'fullscreen = 0' \
-              'android.api = 33' \
-              'android.ndk = 25b' \
-              'android.sdk = 24' \
-              'android.archs = arm64-v8a, armeabi-v7a' \
-              'android.permissions = INTERNET,ACCESS_NETWORK_STATE' \
-              'android.logcat_filters = *:S python:D' \
-              'android.allow_backup = True' \
-              '[buildozer]' \
-              'log_level = 2' \
-              'warn_on_root = 1' \
-              > "$BUILDOZER_SPEC"
+          if [ -f "$BUILDOZER_SPEC" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::error::未找到 $BUILDOZER_SPEC，无法构建 APK。"
+            exit 1
           fi
-
+      - name: 切换 Android 入口为 Kivy 启动器
+        if: steps.checkSpec.outputs.exists == 'true'
+        run: |
+          # python-for-android 默认以 main.py 为入口；
+          # 桌面端 main.py 是 Tornado 服务，Android 需 Kivy UI 入口。
+          cp main.py main.py.bak
+          cp main_android.py main.py
+          echo "已将 main_android.py 复制为 main.py（原 main.py 备份为 main.py.bak）"
       - name: 注入版本号到 buildozer.spec
         if: steps.checkSpec.outputs.exists == 'true'
         run: |
-          sed -i "s/^version = .*/version = $VERSION/" "$BUILDOZER_SPEC"
-          grep -E "^version" "$BUILDOZER_SPEC" || true
-
-      - name: 强制设置稳定依赖版本
+          # version.txt 形如 v0.3.2，p4a build.py 按 '.' 拆分后逐段 int()，
+          # 遇到 'v0' 会抛 ValueError，故去掉前导 v。
+          ver_num="${VERSION#v}"
+          sed -i "s/^version = .*/version = $ver_num/" "$BUILDOZER_SPEC"
+          # version_code 必须是纯整数：取 主.次.补 三段，去掉非数字后段，拼成补零整数
+          IFS='.' read -r major minor patch <<< "$ver_num"
+          major="${major%%[!0-9]*}"; major="${major:-0}"
+          minor="${minor%%[!0-9]*}"; minor="${minor:-0}"
+          patch="${patch%%[!0-9]*}"; patch="${patch:-0}"
+          numeric_version=$(( major*10000 + minor*100 + patch ))
+          # 写入/替换 android.numeric_version
+          if grep -q "^android.numeric_version" "$BUILDOZER_SPEC"; then
+            sed -i "s/^android.numeric_version = .*/android.numeric_version = $numeric_version/" "$BUILDOZER_SPEC"
+          else
+            printf '\nandroid.numeric_version = %s\n' "$numeric_version" >> "$BUILDOZER_SPEC"
+          fi
+          echo "version=$ver_num numeric_version=$numeric_version"
+          grep -E "^(version|android.numeric_version)" "$BUILDOZER_SPEC"
+      - name: 编译 Android Debug APK
         if: steps.checkSpec.outputs.exists == 'true'
-        run: |
-          if grep -q "^requirements" "$BUILDOZER_SPEC"; then
-            existing_reqs=$(grep "^requirements" "$BUILDOZER_SPEC" | head -n 1 | sed 's/requirements = //')
-            echo "原始 requirements: $existing_reqs"
-            new_reqs=$(echo "$existing_reqs" | sed -E 's/(^|,)python3(==[^,]*)?/\1python3==3.11.9/g')
-            if [[ "$new_reqs" != *"python3==3.11.9"* ]]; then
-              new_reqs="python3==3.11.9,$new_reqs"
-            fi
-            new_reqs=$(echo "$new_reqs" | sed -E 's/(^|,)kivy(==[^,]*)?/\1kivy==2.3.0/g')
-            if [[ "$new_reqs" != *"kivy=="* ]]; then
-              new_reqs="$new_reqs,kivy==2.3.0"
-            fi
-            if [[ "$new_reqs" != *",sdl2"* ]] && [[ "$new_reqs" != "sdl2"* ]] && [[ "$new_reqs" != *",sdl2,"* ]]; then
-              new_reqs="$new_reqs,sdl2"
-            fi
-            new_reqs=$(echo "$new_reqs" | sed 's/^,//' | sed 's/,,*/,/g')
-            sed -i "s/^requirements = .*/requirements = $new_reqs/" "$BUILDOZER_SPEC"
-          else
-            echo "requirements = python3==3.11.9,kivy==2.3.0,sdl2" >> "$BUILDOZER_SPEC"
-          fi
-          if ! grep -q "^android.api" "$BUILDOZER_SPEC"; then
-            echo "android.api = 33" >> "$BUILDOZER_SPEC"
-          else
-            sed -i "s/^android.api = .*/android.api = 33/" "$BUILDOZER_SPEC"
-          fi
-          if ! grep -q "^android.ndk" "$BUILDOZER_SPEC"; then
-            echo "android.ndk = 25b" >> "$BUILDOZER_SPEC"
-          else
-            sed -i "s/^android.ndk = .*/android.ndk = 25b/" "$BUILDOZER_SPEC"
-          fi
-          if ! grep -q "^android.sdk" "$BUILDOZER_SPEC"; then
-            echo "android.sdk = 24" >> "$BUILDOZER_SPEC"
-          else
-            sed -i "s/^android.sdk = .*/android.sdk = 24/" "$BUILDOZER_SPEC"
-          fi
-          if ! grep -q "^android.archs" "$BUILDOZER_SPEC"; then
-            echo "android.archs = arm64-v8a, armeabi-v7a" >> "$BUILDOZER_SPEC"
-          fi
-          echo "=== 配置检查 ==="
-          grep -E "^(requirements|android\.(api|ndk|sdk|archs))" "$BUILDOZER_SPEC" || true
-
-      - name: 清理并编译 Android Debug APK
-        if: steps.checkSpec.outputs.exists == 'true'
-        run: |
-          buildozer android clean
-          buildozer android debug
+        run: buildozer -v android debug
 
       - name: 重命名 APK
         if: steps.checkSpec.outputs.exists == 'true'
@@ -178,7 +189,6 @@ jobs:
             echo "::error::未找到编译产物 APK"
             exit 1
           fi
-
       - name: 上传artifact
         if: steps.checkSpec.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
@@ -186,24 +196,3 @@ jobs:
           name: dist-android
           path: dist/*.apk
           retention-days: 7
-
-  upload-release:
-    name: 上传到release
-    runs-on: ubuntu-latest
-    needs: [ get-version, build-android ]
-    env:
-      VERSION: ${{ needs.get-version.outputs.VERSION }}
-    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
-
-    steps:
-      - name: 下载构建结果
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-android
-          path: dist
-
-      - name: 上传到release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.VERSION }}
-          files: dist/*.apk
