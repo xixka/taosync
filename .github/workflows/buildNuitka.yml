@@ -113,7 +113,8 @@ jobs:
               echo "======================"
 
               # ===== 安装 Nuitka 及打包辅助依赖 =====
-              python -m pip install --upgrade pip
+              # termux 禁止 upgrade pip (会破坏 python-pip 包), 直接用自带 pip
+              # termux 的 python 包已内置 pip, 无需升级
               python -m pip install nuitka ordered-set zstandard
 
               # ===== 安装项目依赖 =====
