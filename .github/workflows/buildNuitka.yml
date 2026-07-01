@@ -71,28 +71,35 @@ jobs:
         with:
           platforms: all
 
+      - name: 开放工作目录权限 (供 termux system 用户读写)
+        run: chmod -R 777 .
+
       - name: 在 Termux 中用 Nuitka 编译 Android PIE
+        # 注意: 不要覆盖 entrypoint! termux-docker 的 /entrypoint.sh 负责设置
+        # PREFIX / PATH / HOME / LD_LIBRARY_PATH 并降权到 system 用户.
+        # 覆盖成 /bin/bash 会因为该路径在 termux 镜像里不存在而报错.
+        # 命令作为 args 传入, entrypoint 完成 env 设置后会 exec 它.
         run: |
           docker run --rm \
             --platform ${{ matrix.docker_platform }} \
+            --init \
+            --security-opt seccomp=unconfined \
             -v "$(pwd):/app" \
             -w /app \
             -e APP_NAME=${{ env.APP_NAME }} \
-            --entrypoint /bin/bash \
             termux/termux-docker:${{ matrix.platform }} \
-            -c '
+            bash -c '
               set -e
 
-              # ===== 配置 Termux 运行环境 =====
-              # termux-docker 默认 entrypoint 会切到 termux 用户, 这里覆盖后是 root,
-              # 需要手动设置 termux 的 prefix / path / lib / home
-              export PREFIX=/data/data/com.termux/files/usr
-              export TERMUX_PREFIX=$PREFIX
-              export PATH=$PREFIX/bin:$PATH
-              export LD_LIBRARY_PATH=$PREFIX/lib
-              export HOME=/data/data/com.termux/files/home
-              mkdir -p "$HOME" "$PREFIX/tmp"
-              export TMPDIR=$PREFIX/tmp
+              # entrypoint 已设置好 termux 环境 (PREFIX/PATH/HOME/LD_LIBRARY_PATH),
+              # 这里仅复制定制变量, 并校验环境
+              echo "===== 环境信息 ====="
+              echo "whoami=$(whoami)"
+              echo "PREFIX=$PREFIX"
+              echo "HOME=$HOME"
+              python --version
+              clang --version | head -n 1
+              echo "===================="
 
               # ===== 安装编译工具链与 Python =====
               # Nuitka 官方要求: patchelf ccache binutils ldd termux-elf-cleaner
@@ -109,12 +116,8 @@ jobs:
                 python -m pip install -r requirements.txt
               fi
 
-              # ===== 调试信息 =====
-              echo "===== 环境信息 ====="
-              python --version
-              clang --version | head -n 1
+              # ===== Nuitka 版本 =====
               python -m nuitka --version
-              echo "===================="
 
               # ===== 清理旧产物 =====
               rm -rf "/app/build/${{ matrix.platform }}" "/app/dist/${{ matrix.platform }}"
@@ -141,9 +144,9 @@ jobs:
 
               chmod +x "/app/dist/${{ matrix.platform }}/${APP_NAME}.dist/$APP_NAME"
 
-              # ===== 修正产物归属, 让 runner 用户可读 =====
-              chown -R 1001:121 /app/dist
-              chmod -R 755 /app/dist
+              # ===== 开放产物权限, 让宿主 runner 用户(1001)可读可写 =====
+              # 不能 chown, system 用户没权限; chmod 自己的文件没问题
+              chmod -R a+rwX /app/dist /app/build
             '
 
       - name: 压缩产物 (Zip)
