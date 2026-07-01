@@ -137,8 +137,10 @@ jobs:
               python -m nuitka --version
 
               # ===== 校验入口文件存在 =====
-              if [ ! -f "$APP_NAME.py" ]; then
-                echo "FATAL: 入口文件 $APP_NAME.py 不存在! 当前目录:"
+              # 实际入口是 main.py, APP_NAME (taoSync) 只用作产物名
+              ENTRY_FILE="main.py"
+              if [ ! -f "$ENTRY_FILE" ]; then
+                echo "FATAL: 入口文件 $ENTRY_FILE 不存在! 当前目录:"
                 ls -la
                 exit 1
               fi
@@ -146,6 +148,11 @@ jobs:
               # ===== 清理旧产物 =====
               rm -rf "/app/build/$PLATFORM" "/app/dist/$PLATFORM"
               mkdir -p "/app/dist/$PLATFORM"
+
+              # ===== 复制入口文件为 APP_NAME.py, 让 Nuitka 产物名带 APP_NAME =====
+              # Nuitka 默认按入口文件名命名产物 (xxx.dist/xxx), 复制一份最简单
+              cp -f "$ENTRY_FILE" "$APP_NAME.py"
+              trap "rm -f \"$APP_NAME.py\"" EXIT
 
               # ===== 使用 Nuitka 编译为 Android PIE 可执行文件 =====
               # Termux 的 clang 默认输出 PIE (-fPIE -pie), 满足 Android 5.0+ 强制要求
