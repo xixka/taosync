@@ -172,6 +172,13 @@ jobs:
               mv "/app/build/$PLATFORM/${APP_NAME}.dist" \
                  "/app/dist/$PLATFORM/${APP_NAME}.dist"
 
+              # Nuitka 在 termux/android 上产物名带 .bin 后缀 (taoSync.bin)
+              # 重命名为不带后缀, 方便用户在 termux 里直接 ./taoSync 运行
+              BIN_NAME="${APP_NAME}.bin"
+              if [ -f "/app/dist/$PLATFORM/${APP_NAME}.dist/$BIN_NAME" ]; then
+                mv "/app/dist/$PLATFORM/${APP_NAME}.dist/$BIN_NAME" \
+                   "/app/dist/$PLATFORM/${APP_NAME}.dist/$APP_NAME"
+              fi
               chmod +x "/app/dist/$PLATFORM/${APP_NAME}.dist/$APP_NAME"
 
               # ===== 开放产物权限, 让宿主 runner 用户(1001)可读可写 =====
