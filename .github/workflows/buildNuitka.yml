@@ -79,6 +79,11 @@ jobs:
         # PREFIX / PATH / HOME / LD_LIBRARY_PATH 并降权到 system 用户.
         # 覆盖成 /bin/bash 会因为该路径在 termux 镜像里不存在而报错.
         # 命令作为 args 传入, entrypoint 完成 env 设置后会 exec 它.
+        #
+        # 重要: entrypoint.sh 切换 system 用户时用了 `su -i`, 会清空环境变量
+        # 只保留白名单 (ANDROID_DATA/HOME/LANG/PATH/PREFIX/TMPDIR/TZ/TERM).
+        # 所以 docker -e 传进去的变量会丢! 必须用 ${{ env.XXX }} 让 GitHub Actions
+        # 在 workflow 求值阶段直接做文本替换, 不能依赖容器内 env.
         run: |
           docker run --rm \
             --platform ${{ matrix.docker_platform }} \
@@ -86,10 +91,14 @@ jobs:
             --security-opt seccomp=unconfined \
             -v "$(pwd):/app" \
             -w /app \
-            -e APP_NAME=${{ env.APP_NAME }} \
             termux/termux-docker:${{ matrix.platform }} \
             bash -c '
               set -e
+
+              # 用 GitHub Actions 表达式注入 (绕过 entrypoint 的 env 清空)
+              APP_NAME="${{ env.APP_NAME }}"
+              PLATFORM="${{ matrix.platform }}"
+              export APP_NAME PLATFORM
 
               # entrypoint 已设置好 termux 环境 (PREFIX/PATH/HOME/LD_LIBRARY_PATH)
               echo "===== 基础环境 ====="
@@ -97,6 +106,8 @@ jobs:
               echo "PREFIX=$PREFIX"
               echo "HOME=$HOME"
               echo "PATH=$PATH"
+              echo "APP_NAME=$APP_NAME"
+              echo "PLATFORM=$PLATFORM"
               echo "=================="
 
               # ===== 安装编译工具链与 Python =====
@@ -125,9 +136,16 @@ jobs:
               # ===== Nuitka 版本 =====
               python -m nuitka --version
 
+              # ===== 校验入口文件存在 =====
+              if [ ! -f "$APP_NAME.py" ]; then
+                echo "FATAL: 入口文件 $APP_NAME.py 不存在! 当前目录:"
+                ls -la
+                exit 1
+              fi
+
               # ===== 清理旧产物 =====
-              rm -rf "/app/build/${{ matrix.platform }}" "/app/dist/${{ matrix.platform }}"
-              mkdir -p "/app/dist/${{ matrix.platform }}"
+              rm -rf "/app/build/$PLATFORM" "/app/dist/$PLATFORM"
+              mkdir -p "/app/dist/$PLATFORM"
 
               # ===== 使用 Nuitka 编译为 Android PIE 可执行文件 =====
               # Termux 的 clang 默认输出 PIE (-fPIE -pie), 满足 Android 5.0+ 强制要求
@@ -137,18 +155,17 @@ jobs:
               python -m nuitka \
                 --standalone \
                 --follow-imports \
-                --no-pyi-file \
                 --remove-output \
                 --assume-yes-for-downloads \
-                --output-dir="/app/build/${{ matrix.platform }}" \
+                --output-dir="/app/build/$PLATFORM" \
                 --include-data-dir=frontend/dist=frontend/dist \
                 "$APP_NAME.py"
 
               # ===== 移动 .dist 目录到 dist =====
-              mv "/app/build/${{ matrix.platform }}/${APP_NAME}.dist" \
-                 "/app/dist/${{ matrix.platform }}/${APP_NAME}.dist"
+              mv "/app/build/$PLATFORM/${APP_NAME}.dist" \
+                 "/app/dist/$PLATFORM/${APP_NAME}.dist"
 
-              chmod +x "/app/dist/${{ matrix.platform }}/${APP_NAME}.dist/$APP_NAME"
+              chmod +x "/app/dist/$PLATFORM/${APP_NAME}.dist/$APP_NAME"
 
               # ===== 开放产物权限, 让宿主 runner 用户(1001)可读可写 =====
               # 不能 chown, system 用户没权限; chmod 自己的文件没问题
