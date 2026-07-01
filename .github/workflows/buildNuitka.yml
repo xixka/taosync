@@ -1,0 +1,159 @@
+name: buildNuitka
+
+on:
+  workflow_dispatch:
+
+env:
+  APP_NAME: taoSync
+
+jobs:
+  get-version:
+    name: 获取版本号
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.getVersion.outputs.VERSION }}
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+      - id: getVersion
+        run: |
+          versions=$(head -n 1 version.txt)
+          IFS=',' read -ra versionList <<< "$versions"
+          echo "VERSION=${versionList[0]}" >> "$GITHUB_OUTPUT"
+
+  build-frontend:
+    name: 构建前端
+    runs-on: ubuntu-latest
+    needs: [ get-version ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "14.x"
+      - run: |
+          sed -i "s/__version_placeholder__/${{ needs.get-version.outputs.VERSION }}/g" frontend/src/views/page/setting/index.vue
+          cd frontend && npm install && npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
+
+  build-android:
+    name: 构建Android PIE (Nuitka + Termux)
+    runs-on: ubuntu-latest
+    needs: [ get-version, build-frontend ]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 主流 Android 设备: 64 位 ARM
+          - platform: aarch64
+            docker_platform: linux/arm64
+          # 老旧 Android 设备: 32 位 ARM
+          - platform: arm
+            docker_platform: linux/arm/v7
+          # Android 模拟器 / Chromebook: 64 位 x86
+          - platform: x86_64
+            docker_platform: linux/amd64
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 下载前端产物
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: 在 Termux 中用 Nuitka 编译 Android PIE
+        run: |
+          docker run --rm \
+            --platform ${{ matrix.docker_platform }} \
+            -v "$(pwd):/app" \
+            -w /app \
+            -e APP_NAME=${{ env.APP_NAME }} \
+            --entrypoint /bin/bash \
+            termux/termux-docker:${{ matrix.platform }} \
+            -c '
+              set -e
+
+              # ===== 配置 Termux 运行环境 =====
+              # termux-docker 默认 entrypoint 会切到 termux 用户, 这里覆盖后是 root,
+              # 需要手动设置 termux 的 prefix / path / lib / home
+              export PREFIX=/data/data/com.termux/files/usr
+              export TERMUX_PREFIX=$PREFIX
+              export PATH=$PREFIX/bin:$PATH
+              export LD_LIBRARY_PATH=$PREFIX/lib
+              export HOME=/data/data/com.termux/files/home
+              mkdir -p "$HOME" "$PREFIX/tmp"
+              export TMPDIR=$PREFIX/tmp
+
+              # ===== 安装编译工具链与 Python =====
+              # Nuitka 官方要求: patchelf ccache binutils ldd termux-elf-cleaner
+              # clang 是 Nuitka 的 C 编译器, make 是构建工具
+              pkg update -y
+              pkg install -y python clang make patchelf ccache binutils ldd termux-elf-cleaner
+
+              # ===== 安装 Nuitka 及打包辅助依赖 =====
+              python -m pip install --upgrade pip
+              python -m pip install nuitka ordered-set zstandard
+
+              # ===== 安装项目依赖 =====
+              if [ -f requirements.txt ]; then
+                python -m pip install -r requirements.txt
+              fi
+
+              # ===== 调试信息 =====
+              echo "===== 环境信息 ====="
+              python --version
+              clang --version | head -n 1
+              python -m nuitka --version
+              echo "===================="
+
+              # ===== 清理旧产物 =====
+              rm -rf "/app/build/${{ matrix.platform }}" "/app/dist/${{ matrix.platform }}"
+              mkdir -p "/app/dist/${{ matrix.platform }}"
+
+              # ===== 使用 Nuitka 编译为 Android PIE 可执行文件 =====
+              # Termux 的 clang 默认输出 PIE (-fPIE -pie), 满足 Android 5.0+ 强制要求
+              # --standalone      : 生成独立分发包 (目录形式, 含所有依赖)
+              # --follow-imports  : 自动跟踪所有 import, 等价于 PyInstaller 的 hiddenimports
+              # --include-data-dir: 把前端 dist 打进产物, 对应 spec 中的 datas
+              python -m nuitka \
+                --standalone \
+                --follow-imports \
+                --no-pyi-file \
+                --remove-output \
+                --assume-yes-for-downloads \
+                --output-dir="/app/build/${{ matrix.platform }}" \
+                --include-data-dir=frontend/dist=frontend/dist \
+                "$APP_NAME.py"
+
+              # ===== 移动 .dist 目录到 dist =====
+              mv "/app/build/${{ matrix.platform }}/${APP_NAME}.dist" \
+                 "/app/dist/${{ matrix.platform }}/${APP_NAME}.dist"
+
+              chmod +x "/app/dist/${{ matrix.platform }}/${APP_NAME}.dist/$APP_NAME"
+
+              # ===== 修正产物归属, 让 runner 用户可读 =====
+              chown -R 1001:121 /app/dist
+              chmod -R 755 /app/dist
+            '
+
+      - name: 压缩产物 (Zip)
+        run: |
+          cd dist/${{ matrix.platform }}
+          zip -r "../../${{ env.APP_NAME }}-android-Nuitka-${{ matrix.platform }}.zip" .
+
+      - name: 上传 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-android-Nuitka-${{ matrix.platform }}
+          path: ${{ env.APP_NAME }}-android-Nuitka-${{ matrix.platform }}.zip
+          retention-days: 90
