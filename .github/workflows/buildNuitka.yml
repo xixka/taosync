@@ -91,21 +91,26 @@ jobs:
             bash -c '
               set -e
 
-              # entrypoint 已设置好 termux 环境 (PREFIX/PATH/HOME/LD_LIBRARY_PATH),
-              # 这里仅复制定制变量, 并校验环境
-              echo "===== 环境信息 ====="
+              # entrypoint 已设置好 termux 环境 (PREFIX/PATH/HOME/LD_LIBRARY_PATH)
+              echo "===== 基础环境 ====="
               echo "whoami=$(whoami)"
               echo "PREFIX=$PREFIX"
               echo "HOME=$HOME"
-              python --version
-              clang --version | head -n 1
-              echo "===================="
+              echo "PATH=$PATH"
+              echo "=================="
 
               # ===== 安装编译工具链与 Python =====
-              # Nuitka 官方要求: patchelf ccache binutils ldd termux-elf-cleaner
+              # termux-docker 镜像默认不带 python/clang, 必须先装!
+              # Nuitka 官方要求 termux 安装: patchelf ccache binutils ldd termux-elf-cleaner
               # clang 是 Nuitka 的 C 编译器, make 是构建工具
               pkg update -y
               pkg install -y python clang make patchelf ccache binutils ldd termux-elf-cleaner
+
+              # ===== 安装后校验工具链 =====
+              echo "===== 工具链版本 ====="
+              python --version
+              clang --version | head -n 1
+              echo "======================"
 
               # ===== 安装 Nuitka 及打包辅助依赖 =====
               python -m pip install --upgrade pip
