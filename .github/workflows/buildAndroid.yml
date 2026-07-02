@@ -9,6 +9,11 @@ on:
 env:
   APP_NAME: taoSync
   BUILDOZER_SPEC: buildozer.spec
+  # p4a 2024.01.21 的 python3 recipe 默认使用 Python 3.11.5，
+  # 在 Android 上稳定运行；p4a 2026.5.9 强制 Python 3.14.2 会触发
+  # FORTIFY: pthread_mutex_lock called on a destroyed mutex 崩溃。
+  P4A_VERSION: 2024.01.21
+  CACHE_VERSION: v6
 
 jobs:
   get-version:
@@ -86,7 +91,8 @@ jobs:
       - name: 设置python环境
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          # 宿主 Python 与目标 Python 保持一致（3.11），避免 host/target ABI 不匹配
+          python-version: '3.11'
 
       - name: 安装系统依赖
         run: |
@@ -99,7 +105,7 @@ jobs:
             libltdl-dev libtool-bin \
             ccache git wget unzip zip \
             openjdk-17-jdk build-essential
-          sudo ln -sf /usr/bin/python3 /usr/bin/python
+          sudo ln -sf $(which python3) /usr/bin/python
           # libffi 的 configure.ac 用到 LT_SYS_SYMBOL_USCORE 等宏，
           # 需让 autoconf 能找到 libtool 提供的 m4 文件，否则 autoreconf 失败。
           echo "ACLOCAL_PATH=/usr/share/aclocal" >> $GITHUB_ENV
@@ -112,9 +118,12 @@ jobs:
       - name: 安装 Buildozer 与 python-for-android
         run: |
           python -m pip install --upgrade pip
-          # 固定使用 p4a 稳定版（master 分支，支持 Python 3.12）
-          # 避免装到 develop 分支导致编译出 Python 3.14 运行时（项目依赖不兼容 3.14）
-          python -m pip install "buildozer==1.5.0" "python-for-android==2024.01.21" "Cython==0.29.36" virtualenv
+          # buildozer 1.5.0 与 p4a 2024.01.21 同期发布，API 兼容。
+          # 注意：buildozer 构建时会自己从 git 克隆 p4a（由 buildozer.spec 中
+          # p4a.branch = v2024.01.21 控制），pip 安装的 p4a 仅用于命令行工具。
+          python -m pip install "buildozer==1.5.0" "python-for-android==${P4A_VERSION}" "Cython==0.29.34" virtualenv
+          python -c "import pythonforandroid; print('p4a version:', pythonforandroid.__version__)"
+          p4a create --help > /dev/null 2>&1 || true
       - name: 缓存 Buildozer 全局目录
         uses: actions/cache@v4
         with:
@@ -122,20 +131,28 @@ jobs:
             ~/.buildozer
             ~/.gradle
             /opt/android-sdk
-          key: buildozer-${{ runner.os }}-py312-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+          key: buildozer-${{ runner.os }}-${{ env.CACHE_VERSION }}-p4a${{ env.P4A_VERSION }}-py311-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
           restore-keys: |
-            buildozer-${{ runner.os }}-py312-
-      - name: 清理旧构建产物（避免复用 Python 3.14 脏缓存）
+            buildozer-${{ runner.os }}-${{ env.CACHE_VERSION }}-p4a${{ env.P4A_VERSION }}-py311-
+      - name: 清理旧构建产物（彻底清除 p4a 2026.5.9 的 Python 3.14 脏缓存）
         run: |
-          # buildozer 实际把 p4a 源码与编译产物放在 HOME 目录的 ~/.buildozer 下，
-          # 缓存恢复后这里会残留旧 develop 分支构建的 Python 3.14 产物，
-          # 必须清掉才会重新克隆 p4a master 并编译 Python 3.12。
+          echo "=== 彻底清理旧 p4a 编译产物 ==="
           rm -rf ~/.buildozer/android/platform/build-* 2>/dev/null || true
           rm -rf ~/.buildozer/android/platform/python-for-android 2>/dev/null || true
-          # 兜底：清理本地工作目录（部分 buildozer 版本会用本地 .buildozer）
-          rm -rf .buildozer/android/platform/build-* 2>/dev/null || true
-          rm -rf .buildozer/android/platform/python-for-android 2>/dev/null || true
-          echo "已清理 ~/.buildozer 与本地 .buildozer 下的 p4a 源码及编译产物"
+          rm -rf ~/.buildozer/android/platform/build 2>/dev/null || true
+          rm -rf ~/.buildozer/android/app 2>/dev/null || true
+          rm -rf ~/.buildozer/android/dists 2>/dev/null || true
+          rm -rf ~/.buildozer/cache 2>/dev/null || true
+          rm -rf ~/.buildozer/venv 2>/dev/null || true
+          rm -rf ~/.buildozer/.local 2>/dev/null || true
+          rm -rf ~/.buildozer/state 2>/dev/null || true
+
+          echo "=== 清理本地工作目录构建缓存 ==="
+          rm -rf .buildozer 2>/dev/null || true
+          rm -rf bin 2>/dev/null || true
+          rm -rf .python-for-android 2>/dev/null || true
+
+          echo "清理完成"
       - name: 检查 buildozer.spec 是否存在
         id: checkSpec
         run: |
@@ -145,11 +162,11 @@ jobs:
             echo "::error::未找到 $BUILDOZER_SPEC，无法构建 APK。"
             exit 1
           fi
-      - name: 切换 Android 入口为 Kivy 启动器
+      - name: 切换 Android 入口
         if: steps.checkSpec.outputs.exists == 'true'
         run: |
           # python-for-android 默认以 main.py 为入口；
-          # 桌面端 main.py 是 Tornado 服务，Android 需 Kivy UI 入口。
+          # 桌面端 main.py 是 Tornado 服务，Android 使用 main_android.py。
           cp main.py main.py.bak
           cp main_android.py main.py
           echo "已将 main_android.py 复制为 main.py（原 main.py 备份为 main.py.bak）"
@@ -176,8 +193,11 @@ jobs:
           grep -E "^(version|android.numeric_version)" "$BUILDOZER_SPEC"
       - name: 编译 Android Debug APK
         if: steps.checkSpec.outputs.exists == 'true'
-        run: buildozer -v android debug
-
+        # 抑制 requests 的 RequestsDependencyWarning：
+        # pip --target 安装时，chardet 已下载到目标目录但不在 sys.path，
+        # requests/setup.py 执行时 import chardet 失败而发警告。
+        # chardet 实际已打包进 APK，运行时可正常导入。
+        run: PYTHONWARNINGS="ignore:Unable to find acceptable character detection:UserWarning" buildozer -v android debug
       - name: 重命名 APK
         if: steps.checkSpec.outputs.exists == 'true'
         run: |
@@ -196,3 +216,5 @@ jobs:
           name: dist-android
           path: dist/*.apk
           retention-days: 7
+          # apk 本身已是 zip 压缩格式，二次压缩无意义且拖慢上传，设为 0 仅打包不压缩
+          compression-level: 0

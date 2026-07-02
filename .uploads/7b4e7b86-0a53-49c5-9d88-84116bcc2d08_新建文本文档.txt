@@ -1,0 +1,221 @@
+2026-07-01T02:10:39.4634305Z   Obtaining dependency information for tornado from https://files.pythonhosted.org/packages/37/d8/ef374952fd5da67d4463122c2b8e5a96536ec10b4b339254c6dcde81d01c/tornado-6.5.7-cp39-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata
+2026-07-01T02:10:39.4635707Z   Downloading tornado-6.5.7-cp39-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (2.8 kB)
+2026-07-01T02:10:39.4636630Z [31mERROR: Could not find a version that satisfies the requirement webviewjni (from versions: none)[0m[31m
+2026-07-01T02:10:39.4637274Z [0m[31mERROR: No matching distribution found for webviewjni[0m[31m
+2026-07-01T02:10:39.4637640Z [0m
+2026-07-01T02:10:39.4637740Z 
+2026-07-01T02:10:39.4637823Z   STDERR:
+2026-07-01T02:10:39.4637935Z 
+2026-07-01T02:10:39.4638033Z Traceback (most recent call last):
+2026-07-01T02:10:39.4638404Z   File "<frozen runpy>", line 198, in _run_module_as_main
+2026-07-01T02:10:39.4638785Z   File "<frozen runpy>", line 88, in _run_code
+2026-07-01T02:10:39.4639760Z   File "/home/runner/work/taosync/taosync/.buildozer/android/platform/python-for-android/pythonforandroid/toolchain.py", line 1290, in <module>
+2026-07-01T02:10:39.4640426Z     main()
+2026-07-01T02:10:39.4641006Z   File "/home/runner/work/taosync/taosync/.buildozer/android/platform/python-for-android/pythonforandroid/entrypoints.py", line 18, in main
+2026-07-01T02:10:39.4641631Z     ToolchainCL()
+2026-07-01T02:10:39.4642321Z   File "/home/runner/work/taosync/taosync/.buildozer/android/platform/python-for-android/pythonforandroid/toolchain.py", line 721, in __init__
+2026-07-01T02:10:39.4642974Z     getattr(self, command)(args)
+2026-07-01T02:10:39.4643625Z   File "/home/runner/work/taosync/taosync/.buildozer/android/platform/python-for-android/pythonforandroid/toolchain.py", line 104, in wrapper_func
+2026-07-01T02:10:39.4644293Z     build_dist_from_args(ctx, dist, args)
+2026-07-01T02:10:39.4645007Z   File "/home/runner/work/taosync/taosync/.buildozer/android/platform/python-for-android/pythonforandroid/toolchain.py", line 163, in build_dist_from_args
+2026-07-01T02:10:39.4645728Z     build_recipes(build_order, python_modules, ctx,
+2026-07-01T02:10:39.4646443Z   File "/home/runner/work/taosync/taosync/.buildozer/android/platform/python-for-android/pythonforandroid/build.py", line 554, in build_recipes
+2026-07-01T02:10:39.4647094Z     run_pymodules_install(
+2026-07-01T02:10:39.4647766Z   File "/home/runner/work/taosync/taosync/.buildozer/android/platform/python-for-android/pythonforandroid/build.py", line 927, in run_pymodules_install
+2026-07-01T02:10:39.4648452Z     shprint(sh.bash, '-c', (
+2026-07-01T02:10:39.4649062Z   File "/home/runner/work/taosync/taosync/.buildozer/android/platform/python-for-android/pythonforandroid/logger.py", line 174, in shprint
+2026-07-01T02:10:39.4649963Z     for line in output:
+2026-07-01T02:10:39.4650186Z                 ^^^^^^
+2026-07-01T02:10:39.4650601Z   File "/home/runner/.local/lib/python3.12/site-packages/sh/__init__.py", line 879, in __next__
+2026-07-01T02:10:39.4651066Z     self.wait()
+2026-07-01T02:10:39.4651523Z   File "/home/runner/.local/lib/python3.12/site-packages/sh/__init__.py", line 796, in wait
+2026-07-01T02:10:39.4651983Z     self.handle_command_exit_code(exit_code)
+2026-07-01T02:10:39.4652519Z   File "/home/runner/.local/lib/python3.12/site-packages/sh/__init__.py", line 823, in handle_command_exit_code
+2026-07-01T02:10:39.4653021Z     raise exc
+2026-07-01T02:10:39.4653287Z sh.ErrorReturnCode_1: 
+2026-07-01T02:10:39.4653427Z 
+2026-07-01T02:10:39.4654168Z   RAN: /usr/bin/bash -c 'venv/bin/pip install -v --target '"'"'/home/runner/work/taosync/taosync/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/build/python-installs/taosync/arm64-v8a'"'"' --no-deps -r requirements.txt'
+2026-07-01T02:10:39.4654998Z 
+2026-07-01T02:10:39.4655078Z   STDOUT:
+2026-07-01T02:10:39.4655714Z Using pip 26.1.2 from /home/runner/work/taosync/taosync/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a/build/venv/lib/python3.14/site-packages/pip (python 3.14)
+2026-07-01T02:10:39.4656504Z Collecting apscheduler (from -r requirements.txt (line 1))
+2026-07-01T02:10:39.4657449Z   Obtaining dependency information for apscheduler from https://files.pythonhosted.org/packages/42/c9/8638db32514dbb9157b3d82680c6faea89283523edf9ed2415ea3884f2ae/apscheduler-3.11.3-py3-none-any.whl.metadata
+2026-07-01T02:10:39.4658497Z   Using cached apscheduler-3.11.3-py3-none-any.whl.metadata (6.5 kB)
+2026-07-01T02:10:39.4658946Z Collecting configparser (from -r requirements.txt (line 2))
+2026-07-01T02:10:39.4660138Z   Obtaining dependency information for configparser from https://files.pythonhosted.org/packages/09/fe/f61e7129e9e689d9e40bbf8a36fb90f04eceb477f4617c02c6a18463e81f/configparser-7.2.0-py3-none-any.whl.metadata
+2026-07-01T02:10:39.4661134Z   Using cached configparser-7.2.0-py3-none-any.whl.metadata (5.5 kB)
+2026-07-01T02:10:39.4661566Z Collecting pathspec (from -r requirements.txt (line 3))
+2026-07-01T02:10:39.4662469Z   Obtaining dependency information for pathspec from https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl.metadata
+2026-07-01T02:10:39.4663401Z   Using cached pathspec-1.1.1-py3-none-any.whl.metadata (14 kB)
+2026-07-01T02:10:39.4663803Z Collecting requests (from -r requirements.txt (line 4))
+2026-07-01T02:10:39.4664701Z   Obtaining dependency information for requests from https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl.metadata
+2026-07-01T02:10:39.4665761Z   Using cached requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+2026-07-01T02:10:39.4666162Z Collecting six (from -r requirements.txt (line 5))
+2026-07-01T02:10:39.4667035Z   Obtaining dependency information for six from https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl.metadata
+2026-07-01T02:10:39.4667963Z   Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+2026-07-01T02:10:39.4668368Z Collecting tornado (from -r requirements.txt (line 6))
+2026-07-01T02:10:39.4669735Z   Obtaining dependency information for tornado from https://files.pythonhosted.org/packages/37/d8/ef374952fd5da67d4463122c2b8e5a96536ec10b4b339254c6dcde81d01c/tornado-6.5.7-cp39-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata
+2026-07-01T02:10:39.4671083Z   Downloading tornado-6.5.7-cp39-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (2.8 kB)
+2026-07-01T02:10:39.4671955Z [31mERROR: Could not find a version that satisfies the requirement webviewjni (from versions: none)[0m[31m
+2026-07-01T02:10:39.4672591Z [0m[31mERROR: No matching distribution found for webviewjni[0m[31m
+2026-07-01T02:10:39.4672953Z [0m
+2026-07-01T02:10:39.4673053Z 
+2026-07-01T02:10:39.4673132Z   STDERR:
+2026-07-01T02:10:39.4673232Z 
+2026-07-01T02:10:39.4978465Z # Command failed: ['/opt/hostedtoolcache/Python/3.12.13/x64/bin/python', '-m', 'pythonforandroid.toolchain', 'create', '--dist_name=taosync', '--bootstrap=sdl2', '--requirements=python3,tornado,requests,apscheduler,configparser,pathspec,openssl,sqlite3,webviewjni', '--arch=arm64-v8a', '--arch=armeabi-v7a', '--copy-libs', '--color=always', '--storage-dir=/home/runner/work/taosync/taosync/.buildozer/android/platform/build-arm64-v8a_armeabi-v7a', '--ndk-api=21', '--ignore-setup-py', '--debug', '--bootstrap=webview', '--port=8023']
+2026-07-01T02:10:39.4984511Z # ENVIRONMENT:
+2026-07-01T02:10:39.4984906Z #     SHELL = '/bin/bash'
+2026-07-01T02:10:39.4985475Z #     SELENIUM_JAR_PATH = '/usr/share/java/selenium-server.jar'
+2026-07-01T02:10:39.4986123Z #     CONDA = '/usr/share/miniconda'
+2026-07-01T02:10:39.4986719Z #     GITHUB_WORKSPACE = '/home/runner/work/taosync/taosync'
+2026-07-01T02:10:39.4987352Z #     ANDROIDPYTHON_VER = '3.12'
+2026-07-01T02:10:39.4987924Z #     JAVA_HOME_11_X64 = '/usr/lib/jvm/temurin-11-jdk-amd64'
+2026-07-01T02:10:39.4988681Z #     JAVA_HOME_25_X64 = '/usr/lib/jvm/temurin-25-jdk-amd64'
+2026-07-01T02:10:39.4989688Z #     PKG_CONFIG_PATH = '/opt/hostedtoolcache/Python/3.12.13/x64/lib/pkgconfig'
+2026-07-01T02:10:39.4990824Z #     GITHUB_PATH = '/home/runner/work/_temp/_runner_file_commands/add_path_59016733-5580-45cc-ac32-ee062fd5c0d0'
+2026-07-01T02:10:39.4991763Z #     GITHUB_ACTION = '__run_9'
+2026-07-01T02:10:39.4992442Z #     JAVA_HOME = '/usr/lib/jvm/java-17-openjdk-amd64'
+2026-07-01T02:10:39.4993057Z #     GITHUB_RUN_NUMBER = '30'
+2026-07-01T02:10:39.4993549Z #     RUNNER_NAME = 'GitHub Actions 1000000173'
+2026-07-01T02:10:39.4994119Z #     GRADLE_HOME = '/usr/share/gradle-9.6.0'
+2026-07-01T02:10:39.4994675Z #     GITHUB_REPOSITORY_OWNER_ID = '21142462'
+2026-07-01T02:10:39.4995360Z #     ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE = '/opt/actionarchivecache'
+2026-07-01T02:10:39.4996071Z #     XDG_CONFIG_HOME = '/home/runner/.config'
+2026-07-01T02:10:39.4996727Z #     Python_ROOT_DIR = '/opt/hostedtoolcache/Python/3.12.13/x64'
+2026-07-01T02:10:39.4997476Z #     MEMORY_PRESSURE_WRITE = 'c29tZSAyMDAwMDAgMjAwMDAwMAA='
+2026-07-01T02:10:39.4998138Z #     DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
+2026-07-01T02:10:39.4998689Z #     BUILDOZER_SPEC = 'buildozer.spec'
+2026-07-01T02:10:39.4999202Z #     ANT_HOME = '/usr/share/ant'
+2026-07-01T02:10:39.5000022Z #     JAVA_HOME_8_X64 = '/usr/lib/jvm/temurin-8-jdk-amd64'
+2026-07-01T02:10:39.5000636Z #     GITHUB_TRIGGERING_ACTOR = 'xixky'
+2026-07-01T02:10:39.5001468Z #     pythonLocation = '/opt/hostedtoolcache/Python/3.12.13/x64'
+2026-07-01T02:10:39.5002128Z #     GITHUB_REF_TYPE = 'branch'
+2026-07-01T02:10:39.5002658Z #     HOMEBREW_CLEANUP_PERIODIC_FULL_DAYS = '3650'
+2026-07-01T02:10:39.5003288Z #     ACTIONS_RUNNER_RETURN_JOB_RESULT_FOR_HOSTED = '1'
+2026-07-01T02:10:39.5003981Z #     ANDROID_NDK = '/usr/local/lib/android/sdk/ndk/27.3.13750724'
+2026-07-01T02:10:39.5004638Z #     BOOTSTRAP_HASKELL_NONINTERACTIVE = '1'
+2026-07-01T02:10:39.5005220Z #     PWD = '/home/runner/work/taosync/taosync'
+2026-07-01T02:10:39.5005791Z #     PIPX_BIN_DIR = '/opt/pipx_bin'
+2026-07-01T02:10:39.5006282Z #     LOGNAME = 'runner'
+2026-07-01T02:10:39.5006721Z #     GITHUB_REPOSITORY_ID = '1173121953'
+2026-07-01T02:10:39.5007235Z #     GITHUB_ACTIONS = 'true'
+2026-07-01T02:10:39.5007726Z #     USE_BAZEL_FALLBACK_VERSION = 'silent:'
+2026-07-01T02:10:39.5008437Z #     ANDROID_NDK_LATEST_HOME = '/usr/local/lib/android/sdk/ndk/29.0.14206865'
+2026-07-01T02:10:39.5009151Z #     SYSTEMD_EXEC_PID = '2072'
+2026-07-01T02:10:39.5009956Z #     GITHUB_SHA = '938163c62986516823a0df466b87b5843ec2c63c'
+2026-07-01T02:10:39.5010949Z #     GITHUB_WORKFLOW_REF = 'xixky/taosync/.github/workflows/buildAndroid.yml@refs/heads/trae/agent-HB5ulW'
+2026-07-01T02:10:39.5011996Z #     POWERSHELL_DISTRIBUTION_CHANNEL = 'GitHub-Actions-Linux'
+2026-07-01T02:10:39.5012666Z #     RUNNER_ENVIRONMENT = 'github-hosted'
+2026-07-01T02:10:39.5013202Z #     DOTNET_MULTILEVEL_LOOKUP = '0'
+2026-07-01T02:10:39.5013753Z #     GITHUB_REF = 'refs/heads/trae/agent-HB5ulW'
+2026-07-01T02:10:39.5014304Z #     RUNNER_OS = 'Linux'
+2026-07-01T02:10:39.5014867Z #     GITHUB_REF_PROTECTED = 'false'
+2026-07-01T02:10:39.5015382Z #     HOME = '/home/runner'
+2026-07-01T02:10:39.5015905Z #     GITHUB_API_URL = 'https://api.github.com'
+2026-07-01T02:10:39.5016459Z #     LANG = 'C.UTF-8'
+2026-07-01T02:10:39.5016971Z #     GOROOT_1_25_X64 = '/opt/hostedtoolcache/go/1.25.11/x64'
+2026-07-01T02:10:39.5017738Z #     RUNNER_TRACKING_ID = 'github_cc85a9b2-f63d-4879-80ea-e84482eab450'
+2026-07-01T02:10:39.5018553Z #     RUNNER_ARCH = 'X64'
+2026-07-01T02:10:39.5019585Z #     MEMORY_PRESSURE_WATCH = '/sys/fs/cgroup/system.slice/hosted-compute-agent.service/memory.pressure'
+2026-07-01T02:10:39.5020475Z #     RUNNER_TEMP = '/home/runner/work/_temp'
+2026-07-01T02:10:39.5021323Z #     GITHUB_STATE = '/home/runner/work/_temp/_runner_file_commands/save_state_59016733-5580-45cc-ac32-ee062fd5c0d0'
+2026-07-01T02:10:39.5022271Z #     EDGEWEBDRIVER = '/usr/local/share/edge_driver'
+2026-07-01T02:10:39.5022865Z #     JAVA_HOME_21_X64 = '/usr/lib/jvm/temurin-21-jdk-amd64'
+2026-07-01T02:10:39.5023717Z #     GITHUB_ENV = '/home/runner/work/_temp/_runner_file_commands/set_env_59016733-5580-45cc-ac32-ee062fd5c0d0'
+2026-07-01T02:10:39.5024887Z #     GITHUB_EVENT_PATH = '/home/runner/work/_temp/_github_workflow/event.json'
+2026-07-01T02:10:39.5025560Z #     INVOCATION_ID = '6a0bd8e9f4e64094a26556024ff57ce2'
+2026-07-01T02:10:39.5026209Z #     GITHUB_EVENT_NAME = 'workflow_dispatch'
+2026-07-01T02:10:39.5026676Z #     GITHUB_RUN_ID = '28488234037'
+2026-07-01T02:10:39.5027150Z #     JAVA_HOME_17_X64 = '/usr/lib/jvm/temurin-17-jdk-amd64'
+2026-07-01T02:10:39.5027811Z #     ANDROID_NDK_HOME = '/usr/local/lib/android/sdk/ndk/27.3.13750724'
+2026-07-01T02:10:39.5028828Z #     GITHUB_STEP_SUMMARY = '/home/runner/work/_temp/_runner_file_commands/step_summary_59016733-5580-45cc-ac32-ee062fd5c0d0'
+2026-07-01T02:10:39.5030022Z #     HOMEBREW_NO_AUTO_UPDATE = '1'
+2026-07-01T02:10:39.5030465Z #     GITHUB_ACTOR = 'xixky'
+2026-07-01T02:10:39.5030857Z #     NVM_DIR = '/home/runner/.nvm'
+2026-07-01T02:10:39.5031272Z #     SGX_AESM_ADDR = '1'
+2026-07-01T02:10:39.5031645Z #     GITHUB_RUN_ATTEMPT = '1'
+2026-07-01T02:10:39.5032075Z #     ANDROID_HOME = '/usr/local/lib/android/sdk'
+2026-07-01T02:10:39.5032671Z #     GITHUB_GRAPHQL_URL = 'https://api.github.com/graphql'
+2026-07-01T02:10:39.5033198Z #     ACCEPT_EULA = 'Y'
+2026-07-01T02:10:39.5033576Z #     ACLOCAL_PATH = '/usr/share/aclocal'
+2026-07-01T02:10:39.5034142Z #     P4A_VERSION = '2024.01.21'
+2026-07-01T02:10:39.5034510Z #     USER = 'runner'
+2026-07-01T02:10:39.5035454Z #     PSModulePath = '/root/.local/share/powershell/Modules:/usr/local/share/powershell/Modules:/opt/microsoft/powershell/7/Modules:/usr/share/az_15.6.1'
+2026-07-01T02:10:39.5036502Z #     GITHUB_SERVER_URL = 'https://github.com'
+2026-07-01T02:10:39.5036946Z #     PIPX_HOME = '/opt/pipx'
+2026-07-01T02:10:39.5037371Z #     GECKOWEBDRIVER = '/usr/local/share/gecko_driver'
+2026-07-01T02:10:39.5037829Z #     APP_NAME = 'taoSync'
+2026-07-01T02:10:39.5038303Z #     CHROMEWEBDRIVER = '/usr/local/share/chromedriver-linux64'
+2026-07-01T02:10:39.5038809Z #     SHLVL = '1'
+2026-07-01T02:10:39.5039174Z #     ANDROID_SDK_ROOT = '/usr/local/lib/android/sdk'
+2026-07-01T02:10:39.5039932Z #     VCPKG_INSTALLATION_ROOT = '/usr/local/share/vcpkg'
+2026-07-01T02:10:39.5040411Z #     GITHUB_ACTOR_ID = '21142462'
+2026-07-01T02:10:39.5041062Z #     ACTIONS_ORCHESTRATION_ID = 'f20c9a97-cd65-47b3-bd70-9c60a122d606.build-android.__default'
+2026-07-01T02:10:39.5041788Z #     RUNNER_TOOL_CACHE = '/opt/hostedtoolcache'
+2026-07-01T02:10:39.5042217Z #     CACHE_VERSION = 'v2'
+2026-07-01T02:10:39.5042567Z #     ImageVersion = '20260622.220.1'
+2026-07-01T02:10:39.5043060Z #     Python3_ROOT_DIR = '/opt/hostedtoolcache/Python/3.12.13/x64'
+2026-07-01T02:10:39.5043558Z #     DOTNET_NOLOGO = '1'
+2026-07-01T02:10:39.5044020Z #     GITHUB_WORKFLOW_SHA = '938163c62986516823a0df466b87b5843ec2c63c'
+2026-07-01T02:10:39.5044611Z #     GOROOT_1_24_X64 = '/opt/hostedtoolcache/go/1.24.13/x64'
+2026-07-01T02:10:39.5045108Z #     GITHUB_REF_NAME = 'trae/agent-HB5ulW'
+2026-07-01T02:10:39.5045620Z #     GITHUB_JOB = 'build-android'
+2026-07-01T02:10:39.5046119Z #     LD_LIBRARY_PATH = '/opt/hostedtoolcache/Python/3.12.13/x64/lib'
+2026-07-01T02:10:39.5046649Z #     XDG_RUNTIME_DIR = '/run/user/1001'
+2026-07-01T02:10:39.5047107Z #     AZURE_EXTENSION_DIR = '/opt/az/azcliextensions'
+2026-07-01T02:10:39.5047638Z #     GOROOT_1_26_X64 = '/opt/hostedtoolcache/go/1.26.4/x64'
+2026-07-01T02:10:39.5048214Z #     GITHUB_REPOSITORY = 'xixky/taosync'
+2026-07-01T02:10:39.5048721Z #     Python2_ROOT_DIR = '/opt/hostedtoolcache/Python/3.12.13/x64'
+2026-07-01T02:10:39.5049236Z #     CHROME_BIN = '/usr/bin/google-chrome'
+2026-07-01T02:10:39.5049978Z #     ANDROID_NDK_ROOT = '/usr/local/lib/android/sdk/ndk/27.3.13750724'
+2026-07-01T02:10:39.5050522Z #     GITHUB_RETENTION_DAYS = '90'
+2026-07-01T02:10:39.5050907Z #     JOURNAL_STREAM = '9:10946'
+2026-07-01T02:10:39.5051333Z #     RUNNER_WORKSPACE = '/home/runner/work/taosync'
+2026-07-01T02:10:39.5051774Z #     GITHUB_ACTION_REPOSITORY = ''
+2026-07-01T02:10:39.5052164Z #     HCA_CLOUD_PROVIDER = 'azure'
+2026-07-01T02:10:39.5054711Z #     PATH = '/home/runner/.buildozer/android/platform/apache-ant-1.9.4/bin:/usr/lib/jvm/temurin-17-jdk-amd64/bin:/opt/hostedtoolcache/Python/3.12.13/x64/bin:/opt/hostedtoolcache/Python/3.12.13/x64:/snap/bin:/home/runner/.local/bin:/opt/pipx_bin:/home/runner/.cargo/bin:/home/runner/.config/composer/vendor/bin:/usr/local/.ghcup/bin:/home/runner/.dotnet/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin'
+2026-07-01T02:10:39.5057182Z #     GITHUB_BASE_REF = ''
+2026-07-01T02:10:39.5057564Z #     GHCUP_INSTALL_BASE_PREFIX = '/usr/local'
+2026-07-01T02:10:39.5057993Z #     VERSION = 'v0.3.2'
+2026-07-01T02:10:39.5058315Z #     CI = 'true'
+2026-07-01T02:10:39.5058653Z #     SWIFT_PATH = '/usr/share/swift/usr/bin'
+2026-07-01T02:10:39.5059054Z #     ImageOS = 'ubuntu24'
+2026-07-01T02:10:39.5059586Z #     GITHUB_REPOSITORY_OWNER = 'xixky'
+2026-07-01T02:10:39.5059997Z #     GITHUB_HEAD_REF = ''
+2026-07-01T02:10:39.5060355Z #     GITHUB_ACTION_REF = ''
+2026-07-01T02:10:39.5060710Z #     ENABLE_RUNNER_TRACING = 'true'
+2026-07-01T02:10:39.5061338Z #     GITHUB_WORKFLOW = '构建Android'
+2026-07-01T02:10:39.5061734Z #     DEBIAN_FRONTEND = 'noninteractive'
+2026-07-01T02:10:39.5062481Z #     GITHUB_OUTPUT = '/home/runner/work/_temp/_runner_file_commands/set_output_59016733-5580-45cc-ac32-ee062fd5c0d0'
+2026-07-01T02:10:39.5063411Z #     AGENT_TOOLSDIRECTORY = '/opt/hostedtoolcache'
+2026-07-01T02:10:39.5063861Z #     P4A_PYTHON_VERSION = '3.12'
+2026-07-01T02:10:39.5064326Z #     _ = '/opt/hostedtoolcache/Python/3.12.13/x64/bin/buildozer'
+2026-07-01T02:10:39.5064920Z #     PACKAGES_PATH = '/home/runner/.buildozer/android/packages'
+2026-07-01T02:10:39.5065573Z #     ANDROIDSDK = '/home/runner/.buildozer/android/platform/android-sdk'
+2026-07-01T02:10:39.5066284Z #     ANDROIDNDK = '/home/runner/.buildozer/android/platform/android-ndk-r28c'
+2026-07-01T02:10:39.5066863Z #     ANDROIDAPI = '33'
+2026-07-01T02:10:39.5067196Z #     ANDROIDMINAPI = '21'
+2026-07-01T02:10:39.5067523Z # 
+2026-07-01T02:10:39.5067849Z # Buildozer failed to execute the last command
+2026-07-01T02:10:39.5068376Z # The error might be hidden in the log above this error
+2026-07-01T02:10:39.5068920Z # Please read the full log, and search for it before
+2026-07-01T02:10:39.5069672Z # raising an issue with buildozer itself.
+2026-07-01T02:10:39.5070236Z # In case of a bug report, please add a full log with log_level = 2
+2026-07-01T02:10:39.5270614Z ##[error]Process completed with exit code 1.
+2026-07-01T02:10:39.5396121Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-01T02:10:39.5397428Z Post job cleanup.
+2026-07-01T02:10:39.6214550Z [command]/usr/bin/git version
+2026-07-01T02:10:39.6283557Z git version 2.54.0
+2026-07-01T02:10:39.6323453Z Temporarily overriding HOME='/home/runner/work/_temp/37a64f37-d616-4775-b414-07f435c92f2a' before making global git config changes
+2026-07-01T02:10:39.6324845Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-01T02:10:39.6329869Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/taosync/taosync
+2026-07-01T02:10:39.6366749Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-01T02:10:39.6400186Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-01T02:10:39.6623454Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-01T02:10:39.6651047Z http.https://github.com/.extraheader
+2026-07-01T02:10:39.6662425Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-07-01T02:10:39.6694362Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-01T02:10:39.6914945Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-01T02:10:39.6944804Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-07-01T02:10:39.7306236Z Cleaning up orphan processes
+2026-07-01T02:10:39.7635987Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache@v4, actions/checkout@v4, actions/download-artifact@v4, actions/setup-python@v5. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
