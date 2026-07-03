@@ -218,3 +218,41 @@ jobs:
           retention-days: 7
           # apk 本身已是 zip 压缩格式，二次压缩无意义且拖慢上传，设为 0 仅打包不压缩
           compression-level: 0
+
+  create-release:
+    name: 发布release
+    runs-on: ubuntu-latest
+    needs: [get-version, build-android]
+    env:
+      VERSION: ${{ needs.get-version.outputs.VERSION }}
+    # 仅在非 dev 版本发布
+    if: ${{ !contains(needs.get-version.outputs.VERSION, 'dev') }}
+
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 检查 release 标签是否存在
+        id: checkTag
+        run: |
+          if [ -n "$(git ls-remote --tags origin "refs/tags/${VERSION}")" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "release 标签 ${VERSION} 已存在，将更新产物"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "release 标签 ${VERSION} 不存在，跳过发布"
+          fi
+
+      - name: 下载构建结果
+        if: steps.checkTag.outputs.exists == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-android
+          path: dist
+
+      - name: 更新 APK 到 release
+        if: steps.checkTag.outputs.exists == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          files: dist/*
