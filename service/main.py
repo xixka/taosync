@@ -1,8 +1,9 @@
 """
 taoSync 前台服务入口（运行在 :pythonservice 进程）。
 
-业务程序（Tornado 8023）在此进程运行，作为前台服务，避免主进程
-（PythonActivity）被 ColorOS 冻结后 8023 不可访问。
+业务程序（Tornado 8023，0.0.0.0）与日记页（Tornado 8024，仅 127.0.0.1）
+在此进程同时运行，作为前台服务，避免主进程（PythonActivity）被 ColorOS
+冻结后端口不可访问。8024 仅供本机 WebView 加载日记页，不对外暴露。
 
 p4a 的 PythonService 运行在独立进程，sys.path 与工作目录需显式设置。
 """
@@ -96,10 +97,25 @@ class _StdoutCapture:
 # ======================================================================
 # 文件日志后备
 # ======================================================================
+# 候选日志路径，按优先级尝试：
+# 1. app 专属外部目录 getExternalFilesDir（无需权限、始终可写、用户可见，
+#    路径为 /storage/emulated/0/Android/data/<包名>/files/taosync_debug.log）
+# 2. 上面路径的硬编码形式（包名 com.github.taosync），jnius 不可用时兜底
+# 3. 应用内部 cwd（始终可写，但需 root 才能查看）
 _file_fp = None
-for _log_path in ['/storage/emulated/0/Documents/taosync_debug.log',
-                  '/sdcard/Documents/taosync_debug.log',
-                  os.path.join(os.getcwd(), 'debug.log')]:
+_log_paths = []
+try:
+    from jnius import autoclass
+    _ctx = (getattr(autoclass('org.kivy.android.PythonActivity'), 'mActivity', None)
+            or getattr(autoclass('org.kivy.android.PythonService'), 'mService', None))
+    _d = _ctx.getExternalFilesDir(None) if _ctx is not None else None
+    if _d is not None:
+        _log_paths.append(os.path.join(str(_d.getAbsolutePath()), 'taosync_debug.log'))
+except Exception:
+    pass
+_log_paths.append('/storage/emulated/0/Android/data/com.github.taosync/files/taosync_debug.log')
+_log_paths.append(os.path.join(os.getcwd(), 'debug.log'))
+for _log_path in _log_paths:
     try:
         _file_fp = open(_log_path, 'a', buffering=1)
         break
@@ -300,15 +316,12 @@ function poll() {
     .finally(function() { setTimeout(poll, 1500); });
 }
 
-// 标记日志页已激活，供 / 页面检测回退并跳回（防止右滑返回退到 taoSync）
-sessionStorage.setItem('__logview_active__', '1');
-
-// 阻止后退键回到首页/退出 Activity：p4a webview 先加载 / (首页) 作为
-// 历史栈第 0 项，再由 loadUrl 跳到 /__logview__。这里用带 hash 的 URL
-// （与无 hash 的当前页 URL 不同，确保 pushState 生成真实历史项，避免
-// 某些 WebView 对同 URL pushState 的优化）压入多个缓冲项，形成较深
-// 历史栈；后退触发 popstate 时立即补回缓冲项，使后退键只在日志页
-// 内部循环，永远到不了首页。
+// 阻止后退键退出 Activity：8024 的 / 即日记页，p4a webview bootstrap
+// 加载 http://127.0.0.1:8024/ 后由 main_android.py 再次 loadUrl(/)。
+// 这里用带 hash 的 URL（与无 hash 的当前页 URL 不同，确保 pushState
+// 生成真实历史项，避免某些 WebView 对同 URL pushState 的优化）压入
+// 多个缓冲项，形成较深历史栈；后退触发 popstate 时立即补回缓冲项，
+// 使后退键只在日记页内部循环，触发双击退出逻辑而非直接退出。
 (function() {
   var n = 0;
   function push() {
@@ -350,39 +363,23 @@ FRONTEND_PATH = _app_dir
 
 class MainIndex(RequestHandler):
     def get(self):
-        # 默认根路径渲染 taoSync 前端服务页，
-        # 保证直接访问 http://127.0.0.1:8023/ 打开的是 taoSync 页面。
-        # Android WebView 由 main_android.py 的 loadUrl 单独加载 /__logview__。
-        # 注入 JS：若是从日志页回退到此（右滑/后退手势），立即跳回日志页，
-        # 防止退到 taoSync 页面；浏览器首次直接访问 / 不受影响（无标记）。
+        # 8023 业务前端入口：直接渲染 taoSync 前端页面。
+        # 日记页已拆分到 8024（仅 127.0.0.1），由 Android WebView 单独加载，
+        # 浏览器访问 8023 不受影响。
         with open(os.path.join(FRONTEND_PATH, "front", "index.html"),
                   'r', encoding='utf-8') as f:
             html = f.read()
-        inject = (
-            '<script>'
-            'function __checkLogviewBack(){'
-            'if(sessionStorage.getItem("__logview_active__")){'
-            'sessionStorage.removeItem("__logview_active__");'
-            'location.replace("/__logview__");'
-            '}'
-            '}'
-            '__checkLogviewBack();'
-            'window.addEventListener("pageshow",'
-            'function(e){if(e.persisted)__checkLogviewBack();});'
-            '</script>'
-        )
-        if '</head>' in html:
-            html = html.replace('</head>', inject + '</head>', 1)
-        else:
-            html = inject + html
         self.set_header('Content-Type', 'text/html; charset=utf-8')
         self.write(html)
 
 
+# 日记页专用端口：仅绑定 127.0.0.1，供 Android WebView 加载，不对外暴露
+LOG_PORT = 8024
+
+
 def make_business_app(server_cfg):
+    # 8023：业务接口 + taoSync 前端（0.0.0.0，允许外部设备访问）
     return Application([
-        (r"/__log__", LogDataHandler),
-        (r"/__logview__", LogIndexHandler),
         (r"/svr/noAuth/login", systemController.Login),
         (r"/svr/user", systemController.User),
         (r"/svr/language", systemController.Language),
@@ -395,6 +392,14 @@ def make_business_app(server_cfg):
     ], cookie_secret=server_cfg['passwdStr'])
 
 
+def make_log_app():
+    # 8024：仅日记页（127.0.0.1）。/ 渲染日记页，/__log__ 提供日志数据
+    return Application([
+        (r"/__log__", LogDataHandler),
+        (r"/", LogIndexHandler),
+    ])
+
+
 async def main():
     _file_log('INFO', '服务进程正在初始化...')
     onStart.init()
@@ -404,12 +409,17 @@ async def main():
     port = int(server_cfg['port'])
 
     business_app = make_business_app(server_cfg)
-    # 监听 0.0.0.0 允许外部设备访问；服务进程作为前台服务不会被冻结
+    # 8023 业务端口监听 0.0.0.0，允许外部设备访问；服务进程作为前台服务不会被冻结
     business_app.listen(port, address='0.0.0.0')
-    _file_log('INFO', f'服务已启动: http://0.0.0.0:{port}/')
+    _file_log('INFO', f'业务服务已启动: http://0.0.0.0:{port}/')
+
+    # 8024 日记页仅绑定 127.0.0.1，仅供本机 WebView 访问，不对外暴露
+    log_app = make_log_app()
+    log_app.listen(LOG_PORT, address='127.0.0.1')
+    _file_log('INFO', f'日记页已启动: http://127.0.0.1:{LOG_PORT}/')
 
     logger = logging.getLogger()
-    logger.critical(f'启动成功_/_Running at http://127.0.0.1:{port}/')
+    logger.critical(f'启动成功_/_Running at http://127.0.0.1:{port}/ (业务), http://127.0.0.1:{LOG_PORT}/ (日记)')
 
     await asyncio.Event().wait()
 
