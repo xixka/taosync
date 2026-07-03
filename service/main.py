@@ -241,8 +241,10 @@ body {
 .lv-DEBUG .lv { color: #569cd6; }
 .lv-INFO .lv { color: #4ec9b0; }
 .lv-WARNING .lv { color: #dcdcaa; }
-.lv-ERROR, .lv-CRITICAL { color: #f44747; }
-.lv-ERROR .lv, .lv-CRITICAL .lv { color: #f44747; }
+.lv-ERROR { color: #f44747; }
+.lv-CRITICAL { color: #569cd6; }
+.lv-ERROR .lv { color: #f44747; }
+.lv-CRITICAL .lv { color: #569cd6; }
 </style>
 </head>
 <body>
@@ -298,6 +300,26 @@ function poll() {
     .finally(function() { setTimeout(poll, 1500); });
 }
 
+// 标记日志页已激活，供 / 页面检测回退并跳回（防止右滑返回退到 taoSync）
+sessionStorage.setItem('__logview_active__', '1');
+
+// 阻止后退键回到首页/退出 Activity：p4a webview 先加载 / (首页) 作为
+// 历史栈第 0 项，再由 loadUrl 跳到 /__logview__。这里用带 hash 的 URL
+// （与无 hash 的当前页 URL 不同，确保 pushState 生成真实历史项，避免
+// 某些 WebView 对同 URL pushState 的优化）压入多个缓冲项，形成较深
+// 历史栈；后退触发 popstate 时立即补回缓冲项，使后退键只在日志页
+// 内部循环，永远到不了首页。
+(function() {
+  var n = 0;
+  function push() {
+    n += 1;
+    history.pushState({ i: n }, '', '#stay' + n);
+  }
+  push(); push(); push();
+  window.addEventListener('popstate', function() { push(); });
+  window.addEventListener('pageshow', function(e) { if (e.persisted) { push(); push(); } });
+})();
+
 poll();
 </script>
 </body>
@@ -328,7 +350,33 @@ FRONTEND_PATH = _app_dir
 
 class MainIndex(RequestHandler):
     def get(self):
-        self.render(os.path.join(FRONTEND_PATH, "front", "index.html"))
+        # 默认根路径渲染 taoSync 前端服务页，
+        # 保证直接访问 http://127.0.0.1:8023/ 打开的是 taoSync 页面。
+        # Android WebView 由 main_android.py 的 loadUrl 单独加载 /__logview__。
+        # 注入 JS：若是从日志页回退到此（右滑/后退手势），立即跳回日志页，
+        # 防止退到 taoSync 页面；浏览器首次直接访问 / 不受影响（无标记）。
+        with open(os.path.join(FRONTEND_PATH, "front", "index.html"),
+                  'r', encoding='utf-8') as f:
+            html = f.read()
+        inject = (
+            '<script>'
+            'function __checkLogviewBack(){'
+            'if(sessionStorage.getItem("__logview_active__")){'
+            'sessionStorage.removeItem("__logview_active__");'
+            'location.replace("/__logview__");'
+            '}'
+            '}'
+            '__checkLogviewBack();'
+            'window.addEventListener("pageshow",'
+            'function(e){if(e.persisted)__checkLogviewBack();});'
+            '</script>'
+        )
+        if '</head>' in html:
+            html = html.replace('</head>', inject + '</head>', 1)
+        else:
+            html = inject + html
+        self.set_header('Content-Type', 'text/html; charset=utf-8')
+        self.write(html)
 
 
 def make_business_app(server_cfg):
